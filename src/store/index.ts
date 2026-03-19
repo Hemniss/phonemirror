@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS: DefaultSettings = {
   max_fps: 60,
   max_size: 1080,
   bitrate: 8,
+  video_buffer: 0,
   enable_audio: true,
   always_on_top: false,
   show_touches: false,

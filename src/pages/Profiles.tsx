@@ -6,6 +6,7 @@ import {
   X,
   Save,
 } from "lucide-react";
+import Tooltip from "../components/Tooltip";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../store";
 import { getProfiles, saveProfile, deleteProfile } from "../lib/tauri";
@@ -17,6 +18,7 @@ const DEFAULT_PROFILE: Omit<Profile, "id" | "created_at"> = {
   max_fps: 60,
   max_size: 1080,
   bitrate: 8,
+  video_buffer: 0,
   enable_audio: true,
   always_on_top: false,
   show_touches: false,
@@ -249,6 +251,7 @@ function ProfileForm({
           min={15}
           max={120}
           onChange={(v) => set("max_fps", v)}
+          tooltip="Images par seconde. 30 fps consomme moins de ressources. 60 fps est fluide pour la navigation et les jeux. Au-delà de 60, l'amélioration est subtile."
         />
         <NumField
           label="Résolution (px)"
@@ -256,6 +259,7 @@ function ProfileForm({
           min={480}
           max={2160}
           onChange={(v) => set("max_size", v)}
+          tooltip="Résolution maximale en pixels (côté le plus long). 720 = rapide et léger. 1080 = qualité standard. 1440+ = très net mais plus gourmand."
         />
         <NumField
           label="Débit (Mb/s)"
@@ -263,6 +267,15 @@ function ProfileForm({
           min={1}
           max={64}
           onChange={(v) => set("bitrate", v)}
+          tooltip="Quantité de données vidéo par seconde. Sur USB : 8-16 Mb/s. Sur WiFi : 4-8 Mb/s. Plus élevé = meilleure qualité mais plus de bande passante."
+        />
+        <NumField
+          label="Tampon d'affichage (ms)"
+          value={profile.video_buffer}
+          min={0}
+          max={200}
+          onChange={(v) => set("video_buffer", v)}
+          tooltip="Délai avant d'afficher chaque image. 0 ms = latence minimale, idéal pour les jeux. 50-100 ms lisse les saccades sur WiFi instable. Sur USB, gardez 0."
         />
       </div>
 
@@ -271,16 +284,19 @@ function ProfileForm({
           label="Audio activé"
           value={profile.enable_audio}
           onChange={(v) => set("enable_audio", v)}
+          tooltip="Transmet le son du téléphone vers le PC. Nécessite Android 11+. Désactiver réduit légèrement la latence."
         />
         <Toggle
           label="Toujours au premier plan"
           value={profile.always_on_top}
           onChange={(v) => set("always_on_top", v)}
+          tooltip="La fenêtre scrcpy reste visible par-dessus les autres applications. Pratique pour surveiller le téléphone en travaillant."
         />
         <Toggle
           label="Afficher les touches"
           value={profile.show_touches}
           onChange={(v) => set("show_touches", v)}
+          tooltip="Affiche des cercles visuels à chaque toucher. Utile pour les démonstrations ou enregistrements d'écran."
         />
       </div>
 
@@ -319,16 +335,21 @@ function NumField({
   min,
   max,
   onChange,
+  tooltip,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (v: number) => void;
+  tooltip?: string;
 }) {
   return (
     <div>
-      <label className={labelCls}>{label}</label>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <label className="text-xs font-medium text-slate-400">{label}</label>
+        {tooltip && <Tooltip content={tooltip} />}
+      </div>
       <input
         type="number"
         value={value}
@@ -345,16 +366,21 @@ function Toggle({
   label,
   value,
   onChange,
+  tooltip,
 }: {
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
+  tooltip?: string;
 }) {
   return (
     <div className="flex items-center justify-between py-1">
-      <span className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700">
-        {label}
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700">
+          {label}
+        </span>
+        {tooltip && <Tooltip content={tooltip} />}
+      </div>
       <button
         onClick={() => onChange(!value)}
         className={`relative w-10 h-5 rounded-full transition-colors ${value ? "bg-brand-600" : "bg-slate-700"}`}

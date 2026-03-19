@@ -2,81 +2,109 @@
 
 **Streamez votre téléphone Android sur votre PC** — interface graphique moderne pour [scrcpy](https://github.com/Genymobile/scrcpy).
 
-![PhoneMirror Dashboard](docs/screenshot.png)
-
 ## Fonctionnalités
 
 - **Mirroring** en temps réel (USB & WiFi)
-- **Enregistrement** de l'écran du téléphone
 - **Audio** du téléphone sur le PC (Android 11+)
-- **Transfert de fichiers** bidirectionnel (PC ↔ téléphone)
-- **Profils** — sauvegardez vos configurations préférées
+- **Profils** — sauvegardez vos configurations préférées et appliquez-les en un clic
+- **Tampon d'affichage** configurable pour réduire la latence
+- **Rendu Direct3D** activé automatiquement sur Windows
 - **Thème sombre / clair**
-- **Cross-platform** — Windows & Linux
+- **Connexion WiFi** directe ou par appairage (Android 11+)
 
-## Prérequis
+## Installation (Windows)
 
-### Téléphone Android
-1. Activer les **Options développeur** (tapper 7 fois sur "Numéro de build")
-2. Activer le **Débogage USB**
-3. Pour le WiFi Android 11+ : activer le **Débogage WiFi**
+La méthode la plus simple est d'utiliser le script d'installation fourni :
 
-### PC
+1. Clic droit sur `install.ps1` → **Exécuter avec PowerShell** (en tant qu'administrateur)
+2. Le script installe automatiquement : Node.js, Rust, Visual Studio Build Tools C++, scrcpy, ADB
+3. Une fois terminé, lancez l'application :
+
+```powershell
+npm run tauri dev
+```
+
+> **Note Windows** : Si vous avez Windows 11, désactivez **Smart App Control** avant de compiler
+> (Sécurité Windows → Contrôle des applications → Paramètres de contrôle intelligent → Désactivé).
+> Ce paramètre bloque les exécutables générés par Cargo pendant la compilation.
+
+### Installation manuelle
+
+Si vous préférez installer manuellement :
+
 - [Node.js](https://nodejs.org/) 18+
-- [Rust](https://rustup.rs/) (dernière version stable)
-- Tauri CLI : `npm install -g @tauri-apps/cli`
+- [Rust](https://rustup.rs/)
+- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) avec le workload **Développement Desktop en C++**
+- [scrcpy](https://github.com/Genymobile/scrcpy) (via `winget install Genymobile.scrcpy`)
+
+```bash
+npm install
+npm run tauri dev
+```
 
 #### Linux uniquement
 ```bash
 sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
 ```
 
-## Installation & Développement
-
-```bash
-# 1. Cloner le repo
-git clone https://github.com/hemniss/phonemirror.git
-cd phonemirror
-
-# 2. Télécharger scrcpy (binaires bundlés)
-bash scripts/download-scrcpy.sh
-
-# 3. Installer les dépendances frontend
-npm install
-
-# 4. Lancer en mode développement
-npm run tauri dev
-```
+### Prérequis téléphone Android
+1. Activer les **Options développeur** (tapper 7 fois sur "Numéro de build")
+2. Activer le **Débogage USB**
+3. Pour le WiFi Android 11+ : activer le **Débogage WiFi**
 
 ## Build de production
 
 ```bash
-# Générer les icônes d'abord (requis une seule fois)
-# Créez un fichier icon.png (1024x1024) puis :
-npx @tauri-apps/cli icon icon.png
+# Pour régénérer les icônes (si vous modifiez assets/app-icon.png) :
+npm run tauri icon -- assets/app-icon.png
 
-# Build
 npm run tauri build
 ```
 
 Les installeurs se trouvent dans `src-tauri/target/release/bundle/`.
 
-## Connexion WiFi
+## Utilisation
 
-### Méthode USB → WiFi (recommandée)
+### Mirroring simple
+1. Branchez votre téléphone en USB et acceptez la demande de débogage
+2. L'appareil apparaît automatiquement dans le Dashboard
+3. Cliquez sur **Miroir** pour lancer le streaming
+
+### Profils
+Les profils permettent de sauvegarder des configurations (résolution, FPS, débit, tampon...) et de les réutiliser :
+1. Allez dans **Profils** → **Nouveau profil**
+2. Configurez les paramètres souhaités
+3. Sur le Dashboard, le bouton **Profils** apparaît sur chaque appareil — cliquez dessus pour lancer le mirroring avec ce profil
+
+### Connexion WiFi
+
+**Méthode USB → WiFi (recommandée)**
 1. Branchez le téléphone en USB
-2. Dans PhoneMirror, cliquez sur **Miroir** sur la carte de votre appareil
-3. Puis cliquez sur **Passer en WiFi** — l'app active automatiquement le mode TCP/IP
+2. Cliquez sur **Passer en WiFi** sur la carte de l'appareil
 
-### Connexion directe
-1. Cliquez sur **Connexion WiFi** dans la sidebar
-2. Entrez l'IP du téléphone (visible dans Paramètres → À propos → Statut WiFi)
-3. Port : `5555` (par défaut)
+**Connexion directe**
+1. Cliquez sur l'icône WiFi dans la sidebar
+2. Entrez l'IP du téléphone et le port `5555`
 
-### Appairage Android 11+ (sans USB)
-1. Cliquez sur **Connexion WiFi** → onglet **Appairage**
-2. Sur votre téléphone : Paramètres → Options développeur → Débogage WiFi → Appairer avec un code
-3. Entrez l'IP, le port et le code à 6 chiffres affichés sur le téléphone
+**Appairage Android 11+ (sans USB)**
+1. Icône WiFi → onglet **Appairage**
+2. Sur le téléphone : Paramètres → Options développeur → Débogage WiFi → Appairer avec un code
+3. Entrez l'IP, le port et le code à 6 chiffres
+
+## Paramètres disponibles
+
+| Paramètre | Description |
+|-----------|-------------|
+| Résolution max | Résolution de l'écran mirroré (480p–2160p) |
+| FPS maximum | Images par seconde (15–120) |
+| Débit vidéo | Bande passante vidéo en Mb/s (2–32) |
+| Tampon d'affichage | Délai en ms avant affichage — 0 ms pour latence minimale, augmenter sur WiFi instable |
+| Audio | Transmet le son du téléphone (Android 11+) |
+| Toujours au premier plan | La fenêtre scrcpy reste visible au-dessus des autres |
+| Plein écran au démarrage | Lance scrcpy directement en plein écran |
+| Afficher les touches | Cercles visuels à chaque toucher (utile pour enregistrements) |
+
+> Sur Windows, le rendu **Direct3D** est activé automatiquement pour de meilleures performances.
 
 ## Architecture
 
@@ -85,20 +113,27 @@ phonemirror/
 ├── src-tauri/           # Backend Rust (Tauri 2)
 │   ├── src/
 │   │   ├── adb.rs       # Commandes ADB (liste, connexion, IP)
-│   │   ├── scrcpy.rs    # Gestion des processus scrcpy
+│   │   ├── scrcpy.rs    # Gestion des processus scrcpy + config
 │   │   ├── profiles.rs  # Profils JSON persistés
 │   │   └── lib.rs       # Entry point Tauri
-│   └── resources/
-│       └── scrcpy/      # Binaires scrcpy bundlés (généré par le script)
+│   └── tauri.conf.json  # Configuration Tauri (fenêtre, icônes…)
 ├── src/                 # Frontend React + TypeScript
-│   ├── components/      # Composants réutilisables
-│   ├── pages/           # Dashboard, Profiles, Settings
-│   ├── store/           # État global Zustand
-│   ├── hooks/           # useDevices (polling ADB)
-│   ├── lib/tauri.ts     # Wrappers invoke Tauri
-│   └── types/           # Types TypeScript partagés
-└── scripts/
-    └── download-scrcpy.sh  # Télécharge les binaires scrcpy
+│   ├── components/
+│   │   ├── Titlebar.tsx       # Barre de titre personnalisée
+│   │   ├── Sidebar.tsx        # Navigation + toggle thème
+│   │   ├── DeviceCard.tsx     # Carte appareil (mirroring, profils, WiFi)
+│   │   ├── ProfileSelector.tsx # Dropdown profils sur chaque appareil
+│   │   ├── ConnectionModal.tsx # Modal connexion WiFi
+│   │   └── Tooltip.tsx        # Bulles d'info sur les paramètres
+│   ├── pages/
+│   │   ├── Dashboard.tsx  # Liste des appareils connectés
+│   │   ├── Profiles.tsx   # Gestion des profils
+│   │   └── Settings.tsx   # Paramètres par défaut
+│   ├── store/             # État global Zustand
+│   ├── hooks/             # useDevices (polling ADB toutes les 2.5s)
+│   ├── lib/tauri.ts       # Wrappers invoke Tauri
+│   └── types/             # Types TypeScript partagés
+└── install.ps1            # Script d'installation Windows (Node, Rust, scrcpy, ADB)
 ```
 
 ## Stack technique
@@ -123,23 +158,12 @@ phonemirror/
 | `Ctrl+↑/↓` | Volume +/- |
 | `Ctrl+P` | Écran ON/OFF |
 | `Ctrl+N` | Notifications |
-| `Ctrl+F` | Plein écran |
+| `F` | Plein écran |
 | `Ctrl+R` | Rotation |
-
-## Contribution
-
-Les PRs sont les bienvenues ! Ouvrez une issue en premier pour discuter des changements majeurs.
-
-```bash
-git checkout -b feature/ma-fonctionnalite
-# ... vos modifications ...
-git commit -m "feat: ma nouvelle fonctionnalité"
-git push origin feature/ma-fonctionnalite
-```
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE)
+MIT
 
 ---
 

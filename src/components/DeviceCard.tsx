@@ -4,8 +4,6 @@ import {
   Wifi,
   Play,
   Square,
-  Video,
-  FolderOpen,
   WifiOff,
   AlertCircle,
   Lock,
@@ -15,7 +13,7 @@ import { useState } from "react";
 import { useAppStore } from "../store";
 import type { Device } from "../types";
 import { startMirror, stopMirror, enableTcpip, connectWireless } from "../lib/tauri";
-import FileTransferModal from "./FileTransferModal";
+import ProfileSelector from "./ProfileSelector";
 
 interface Props {
   device: Device;
@@ -33,7 +31,6 @@ export default function DeviceCard({ device, onRefresh }: Props) {
   const isMirroringActive = mirroringSerials.includes(device.serial);
 
   const [loading, setLoading] = useState(false);
-  const [showFileModal, setShowFileModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectingWifi, setConnectingWifi] = useState(false);
 
@@ -53,6 +50,7 @@ export default function DeviceCard({ device, onRefresh }: Props) {
           max_fps: defaultSettings.max_fps,
           max_size: defaultSettings.max_size,
           bitrate: defaultSettings.bitrate,
+          video_buffer: defaultSettings.video_buffer,
           enable_audio: defaultSettings.enable_audio,
           always_on_top: defaultSettings.always_on_top,
           fullscreen: defaultSettings.fullscreen,
@@ -88,8 +86,7 @@ export default function DeviceCard({ device, onRefresh }: Props) {
   };
 
   return (
-    <>
-      <div
+    <div
         className={clsx(
           "rounded-xl border p-4 flex flex-col gap-3 transition-all animate-fade-in",
           "bg-slate-900 dark:bg-slate-900 light:bg-white",
@@ -177,13 +174,8 @@ export default function DeviceCard({ device, onRefresh }: Props) {
               variant={isMirroringActive ? "danger" : "primary"}
             />
 
-            {/* Fichiers */}
-            <ActionButton
-              onClick={() => setShowFileModal(true)}
-              icon={<FolderOpen size={14} />}
-              label="Fichiers"
-              variant="secondary"
-            />
+            {/* Profils */}
+            <ProfileSelector device={device} />
 
             {/* Connexion WiFi (si USB et IP connue) */}
             {device.connection_type === "usb" && device.ip_address && (
@@ -211,15 +203,7 @@ export default function DeviceCard({ device, onRefresh }: Props) {
             )}
           </div>
         )}
-      </div>
-
-      {showFileModal && (
-        <FileTransferModal
-          device={device}
-          onClose={() => setShowFileModal(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
