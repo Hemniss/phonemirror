@@ -14,6 +14,7 @@ pub struct MirrorConfig {
     pub max_fps: Option<u32>,
     pub max_size: Option<u32>,
     pub bitrate: Option<u32>,
+    pub video_buffer: Option<u32>,
     pub enable_audio: bool,
     pub always_on_top: bool,
     pub fullscreen: bool,
@@ -70,6 +71,14 @@ pub async fn start_mirror(
         args.push("-b".to_string());
         args.push(format!("{bitrate}M"));
     }
+
+    if let Some(buf) = config.video_buffer {
+        args.push(format!("--video-buffer={buf}"));
+    }
+
+    // Optimisation automatique du rendu sur Windows
+    #[cfg(target_os = "windows")]
+    args.push("--render-driver=direct3d".to_string());
 
     if config.enable_audio {
         args.push("--audio-source=output".to_string());

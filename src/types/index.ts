@@ -15,6 +15,7 @@ export interface MirrorConfig {
   max_fps: number | null;
   max_size: number | null;
   bitrate: number | null;
+  video_buffer: number | null;
   enable_audio: boolean;
   always_on_top: boolean;
   fullscreen: boolean;
@@ -31,6 +32,7 @@ export interface Profile {
   max_fps: number;
   max_size: number;
   bitrate: number;
+  video_buffer: number;
   enable_audio: boolean;
   always_on_top: boolean;
   show_touches: boolean;
@@ -44,6 +46,7 @@ export interface DefaultSettings {
   max_fps: number;
   max_size: number;
   bitrate: number;
+  video_buffer: number;
   enable_audio: boolean;
   always_on_top: boolean;
   show_touches: boolean;

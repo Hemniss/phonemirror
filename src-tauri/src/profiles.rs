@@ -10,6 +10,8 @@ pub struct Profile {
     pub max_fps: u32,
     pub max_size: u32,
     pub bitrate: u32,
+    #[serde(default)]
+    pub video_buffer: u32,
     pub enable_audio: bool,
     pub always_on_top: bool,
     pub show_touches: bool,

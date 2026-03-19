@@ -37,6 +37,7 @@ export default function ProfileSelector({ device }: Props) {
       max_fps: profile.max_fps,
       max_size: profile.max_size,
       bitrate: profile.bitrate,
+      video_buffer: profile.video_buffer,
       enable_audio: profile.enable_audio,
       always_on_top: profile.always_on_top,
       fullscreen: false,
