@@ -12,9 +12,9 @@
 - **Thème sombre / clair**
 - **Connexion WiFi** directe ou par appairage (Android 11+)
 
-## Installation (Windows)
+## Installation
 
-La méthode la plus simple est d'utiliser le script d'installation fourni :
+### Windows
 
 1. Clic droit sur `install.ps1` → **Exécuter avec PowerShell** (en tant qu'administrateur)
 2. Le script installe automatiquement : Node.js, Rust, Visual Studio Build Tools C++, scrcpy, ADB
@@ -24,28 +24,41 @@ La méthode la plus simple est d'utiliser le script d'installation fourni :
 npm run tauri dev
 ```
 
-> **Note Windows** : Si vous avez Windows 11, désactivez **Smart App Control** avant de compiler
+> **Note Windows 11** : Désactivez **Smart App Control** avant de compiler
 > (Sécurité Windows → Contrôle des applications → Paramètres de contrôle intelligent → Désactivé).
 > Ce paramètre bloque les exécutables générés par Cargo pendant la compilation.
 
+### Linux (Ubuntu / Fedora / Arch)
+
+```bash
+bash install.sh
+npm run tauri dev
+```
+
+Le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, scrcpy, ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman.
+
 ### Installation manuelle
 
-Si vous préférez installer manuellement :
+<details>
+<summary>Windows</summary>
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://rustup.rs/)
 - [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) avec le workload **Développement Desktop en C++**
-- [scrcpy](https://github.com/Genymobile/scrcpy) (via `winget install Genymobile.scrcpy`)
+- [scrcpy](https://github.com/Genymobile/scrcpy) (`winget install Genymobile.scrcpy`)
+
+</details>
+
+<details>
+<summary>Linux (Ubuntu/Debian)</summary>
 
 ```bash
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf adb scrcpy
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 npm install
-npm run tauri dev
 ```
 
-#### Linux uniquement
-```bash
-sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
-```
+</details>
 
 ### Prérequis téléphone Android
 1. Activer les **Options développeur** (tapper 7 fois sur "Numéro de build")
