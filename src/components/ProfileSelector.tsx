@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function ProfileSelector({ device }: Props) {
-  const { profiles, defaultSettings, setMirroring } = useAppStore();
+  const { profiles, setMirroring } = useAppStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

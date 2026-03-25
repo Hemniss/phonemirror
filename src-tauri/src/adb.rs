@@ -86,17 +86,8 @@ pub async fn list_devices(app: AppHandle) -> Result<Vec<Device>, String> {
             continue;
         }
 
-        let model = get_prop(&adb, &serial, "ro.product.model")
-            .unwrap_or_else(|_| "Inconnu".to_string());
-        let product = get_prop(&adb, &serial, "ro.product.name").unwrap_or_default();
-        let android_version =
-            get_prop(&adb, &serial, "ro.build.version.release").unwrap_or_default();
-
-        let ip_address = if connection_type == "usb" {
-            get_device_ip(&adb, &serial).ok()
-        } else {
-            extract_ip_from_serial(&serial)
-        };
+        let (model, product, android_version, ip_address) =
+            get_device_info(&adb, &serial, connection_type == "usb");
 
         devices.push(Device {
             serial,
@@ -112,32 +103,44 @@ pub async fn list_devices(app: AppHandle) -> Result<Vec<Device>, String> {
     Ok(devices)
 }
 
-fn get_prop(adb: &std::path::Path, serial: &str, prop: &str) -> Result<String, String> {
-    let output = Command::new(adb)
-        .args(["-s", serial, "shell", "getprop", prop])
-        .output()
-        .map_err(|e| e.to_string())?;
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
+/// Récupère modèle, produit, version Android et IP en **une seule** commande shell.
+/// Remplace les anciens appels séquentiels à get_prop × 3 + get_device_ip.
+fn get_device_info(
+    adb: &std::path::Path,
+    serial: &str,
+    fetch_ip: bool,
+) -> (String, String, String, Option<String>) {
+    let cmd = if fetch_ip {
+        "printf '%s\\n%s\\n%s\\n' \"$(getprop ro.product.model)\" \"$(getprop ro.product.name)\" \"$(getprop ro.build.version.release)\"; ip -f inet addr show wlan0 2>/dev/null"
+    } else {
+        "printf '%s\\n%s\\n%s\\n' \"$(getprop ro.product.model)\" \"$(getprop ro.product.name)\" \"$(getprop ro.build.version.release)\""
+    };
 
-fn get_device_ip(adb: &std::path::Path, serial: &str) -> Result<String, String> {
-    let output = Command::new(adb)
-        .args(["-s", serial, "shell", "ip", "-f", "inet", "addr", "show", "wlan0"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let Ok(output) = Command::new(adb).args(["-s", serial, "shell", cmd]).output() else {
+        return ("Inconnu".to_string(), String::new(), String::new(), None);
+    };
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    for line in stdout.lines() {
-        let line = line.trim();
-        if line.starts_with("inet ") {
-            if let Some(ip) = line.split_whitespace().nth(1).and_then(|s| s.split('/').next()) {
-                if !ip.is_empty() {
-                    return Ok(ip.to_string());
-                }
-            }
-        }
-    }
-    Err("IP introuvable".to_string())
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut lines = text.lines();
+
+    let model = lines.next().unwrap_or("").trim().to_string();
+    let model = if model.is_empty() { "Inconnu".to_string() } else { model };
+    let product = lines.next().unwrap_or("").trim().to_string();
+    let android_version = lines.next().unwrap_or("").trim().to_string();
+
+    let ip = if fetch_ip {
+        lines
+            .map(|l| l.trim())
+            .find(|l| l.starts_with("inet "))
+            .and_then(|l| l.split_whitespace().nth(1))
+            .and_then(|s| s.split('/').next())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+    } else {
+        None
+    };
+
+    (model, product, android_version, ip)
 }
 
 fn extract_ip_from_serial(serial: &str) -> Option<String> {
@@ -223,5 +226,6 @@ pub async fn pair_device(
 #[tauri::command]
 pub async fn get_device_ip_address(app: AppHandle, serial: String) -> Result<String, String> {
     let adb = get_adb_path(&app)?;
-    get_device_ip(&adb, &serial)
+    let (_, _, _, ip) = get_device_info(&adb, &serial, true);
+    ip.ok_or_else(|| "IP introuvable".to_string())
 }
