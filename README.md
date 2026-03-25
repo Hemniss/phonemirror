@@ -8,7 +8,7 @@
 - **Audio** du téléphone sur le PC (Android 11+)
 - **Profils** — sauvegardez vos configurations préférées et appliquez-les en un clic
 - **Tampon d'affichage** configurable pour réduire la latence
-- **Rendu Direct3D** activé automatiquement sur Windows
+- **Rendu optimisé** — Direct3D sur Windows, OpenGL sur Linux (activé automatiquement)
 - **Thème sombre / clair**
 - **Connexion WiFi** directe ou par appairage (Android 11+)
 
@@ -18,10 +18,13 @@
 
 1. Clic droit sur `install.ps1` → **Exécuter avec PowerShell** (en tant qu'administrateur)
 2. Le script installe automatiquement : Node.js, Rust, Visual Studio Build Tools C++, scrcpy, ADB
-3. Une fois terminé, lancez l'application :
+3. Ensuite, utilisez le script `run.ps1` :
 
 ```powershell
-npm run tauri dev
+.\run.ps1          # Compile et lance l'application (défaut)
+.\run.ps1 start    # Lance le binaire déjà compilé
+.\run.ps1 dev      # Mode développement avec hot-reload
+.\run.ps1 install  # Crée des raccourcis (Bureau + menu Démarrer)
 ```
 
 > **Note Windows 11** : Désactivez **Smart App Control** avant de compiler
@@ -32,10 +35,19 @@ npm run tauri dev
 
 ```bash
 bash install.sh
-npm run tauri dev
+source "$HOME/.cargo/env"   # Si Rust vient d'être installé
 ```
 
-Le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, scrcpy, ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman.
+Ensuite, utilisez le script `run.sh` :
+
+```bash
+./run.sh          # Compile et lance l'application (défaut)
+./run.sh start    # Lance le binaire déjà compilé
+./run.sh dev      # Mode développement avec hot-reload
+./run.sh install  # Crée un raccourci dans le menu des applications
+```
+
+Le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, scrcpy (version récente depuis GitHub), ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman.
 
 ### Installation manuelle
 
@@ -53,8 +65,9 @@ Le script installe automatiquement : les dépendances système WebKit/GTK, Node.
 <summary>Linux (Ubuntu/Debian)</summary>
 
 ```bash
-sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf adb scrcpy
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf adb
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Installer scrcpy depuis https://github.com/Genymobile/scrcpy/releases (version >= 2.0)
 npm install
 ```
 
@@ -111,13 +124,13 @@ Les profils permettent de sauvegarder des configurations (résolution, FPS, déb
 | Résolution max | Résolution de l'écran mirroré (480p–2160p) |
 | FPS maximum | Images par seconde (15–120) |
 | Débit vidéo | Bande passante vidéo en Mb/s (2–32) |
-| Tampon d'affichage | Délai en ms avant affichage — 0 ms pour latence minimale, augmenter sur WiFi instable |
+| Tampon d'affichage | Délai en ms avant affichage (`--video-buffer`) — 0 ms pour latence minimale, augmenter sur WiFi instable |
 | Audio | Transmet le son du téléphone (Android 11+) |
 | Toujours au premier plan | La fenêtre scrcpy reste visible au-dessus des autres |
 | Plein écran au démarrage | Lance scrcpy directement en plein écran |
 | Afficher les touches | Cercles visuels à chaque toucher (utile pour enregistrements) |
 
-> Sur Windows, le rendu **Direct3D** est activé automatiquement pour de meilleures performances.
+> Le rendu est optimisé automatiquement selon la plateforme : **Direct3D** sur Windows, **OpenGL** sur Linux.
 
 ## Architecture
 
@@ -143,7 +156,7 @@ phonemirror/
 │   │   ├── Profiles.tsx   # Gestion des profils
 │   │   └── Settings.tsx   # Paramètres par défaut
 │   ├── store/             # État global Zustand
-│   ├── hooks/             # useDevices (polling ADB toutes les 2.5s)
+│   ├── hooks/             # useDevices (polling ADB, setTimeout récursif non-chevauchant)
 │   ├── lib/tauri.ts       # Wrappers invoke Tauri
 │   └── types/             # Types TypeScript partagés
 └── install.ps1            # Script d'installation Windows (Node, Rust, scrcpy, ADB)
@@ -159,7 +172,7 @@ phonemirror/
 | Styles | [Tailwind CSS 3](https://tailwindcss.com/) |
 | État | [Zustand 4](https://zustand-demo.pmnd.rs/) |
 | Icônes | [Lucide React](https://lucide.dev/) |
-| Mirror | [scrcpy 3.x](https://github.com/Genymobile/scrcpy) |
+| Mirror | [scrcpy >= 2.0](https://github.com/Genymobile/scrcpy) |
 
 ## Raccourcis scrcpy (dans la fenêtre de mirroring)
 

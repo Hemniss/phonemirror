@@ -2,7 +2,6 @@ import { useState } from "react";
 import { X, Wifi, Link2, QrCode } from "lucide-react";
 import { clsx } from "clsx";
 import { connectWireless, pairDevice } from "../lib/tauri";
-import { useAppStore } from "../store";
 
 interface Props {
   onClose: () => void;
@@ -25,7 +24,6 @@ export default function ConnectionModal({ onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { setGlobalError } = useAppStore();
 
   const handleConnect = async () => {
     if (!ip.trim()) return;

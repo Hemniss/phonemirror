@@ -1,8 +1,10 @@
 use crate::adb::get_adb_path;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::{Child, Command};
+use std::io::Read;
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 
 /// Gestion des processus scrcpy en cours d'exécution.
@@ -76,9 +78,11 @@ pub async fn start_mirror(
         args.push(format!("--video-buffer={buf}"));
     }
 
-    // Optimisation automatique du rendu sur Windows
+    // Optimisation du rendu selon la plateforme
     #[cfg(target_os = "windows")]
     args.push("--render-driver=direct3d".to_string());
+    #[cfg(target_os = "linux")]
+    args.push("--render-driver=opengl".to_string());
 
     if config.enable_audio {
         args.push("--audio-source=output".to_string());
@@ -116,10 +120,26 @@ pub async fn start_mirror(
         args.push(path.clone());
     }
 
-    let child = Command::new(&scrcpy)
+    let mut child = Command::new(&scrcpy)
         .args(&args)
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Impossible de démarrer scrcpy: {e}"))?;
+
+    // Attendre 600 ms puis vérifier si scrcpy a déjà planté (flag invalide, device inaccessible, etc.)
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    if let Ok(Some(status)) = child.try_wait() {
+        let mut stderr_msg = String::new();
+        if let Some(mut stderr) = child.stderr.take() {
+            let _ = stderr.read_to_string(&mut stderr_msg);
+        }
+        let detail = stderr_msg.trim();
+        return Err(if detail.is_empty() {
+            format!("scrcpy a échoué (code {:?})", status.code())
+        } else {
+            format!("scrcpy: {detail}")
+        });
+    }
 
     let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
     procs.insert(config.serial, child);

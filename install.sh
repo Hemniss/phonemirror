@@ -41,7 +41,7 @@ pkg_install() {
 step "Installation des dépendances système (Tauri / WebKit)..."
 case "$PKG" in
     apt)
-        sudo apt-get update -qq
+        sudo apt-get update -qq || echo -e "   ${YELLOW}[!!]${NC} apt-get update a retourné des avertissements (ignorés)"
         pkg_install \
             libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev \
             librsvg2-dev patchelf libxdo-dev curl build-essential
@@ -87,17 +87,36 @@ if ! command -v cargo &>/dev/null; then
 fi
 
 # ─── scrcpy ───────────────────────────────────────────────────────────────
-step "Vérification de scrcpy..."
+step "Installation de scrcpy (version récente depuis GitHub)..."
+SCRCPY_MIN_VERSION=2
+SCRCPY_INSTALLED_VERSION=0
 if command -v scrcpy &>/dev/null; then
-    skip "scrcpy déjà installé ($(scrcpy --version 2>&1 | head -1))"
+    SCRCPY_INSTALLED_VERSION=$(scrcpy --version 2>&1 | head -1 | awk '{print $2}' | cut -d. -f1)
+fi
+
+if [ "$SCRCPY_INSTALLED_VERSION" -ge "$SCRCPY_MIN_VERSION" ] 2>/dev/null; then
+    skip "scrcpy >= 2.0 déjà installé ($(scrcpy --version 2>&1 | head -1))"
 else
-    echo "   Installation de scrcpy..."
-    case "$PKG" in
-        apt)    pkg_install scrcpy ;;
-        dnf)    pkg_install scrcpy ;;
-        pacman) pkg_install scrcpy ;;
-    esac
-    ok "scrcpy installé"
+    # Supprimer l'ancienne version apt si présente
+    if dpkg -l scrcpy &>/dev/null 2>&1; then
+        echo "   Suppression de l'ancienne version apt..."
+        sudo apt-get remove -y scrcpy 2>/dev/null || true
+    fi
+
+    echo "   Téléchargement de scrcpy depuis GitHub..."
+    SCRCPY_VERSION=$(curl -sI https://github.com/Genymobile/scrcpy/releases/latest | grep -i '^location:' | sed 's/.*\/v//' | tr -d '\r\n')
+    SCRCPY_URL="https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VERSION}/scrcpy-linux-x86_64-v${SCRCPY_VERSION}.tar.gz"
+    SCRCPY_DIR="/opt/scrcpy"
+
+    TMP_DIR=$(mktemp -d)
+    curl -fSL "$SCRCPY_URL" -o "$TMP_DIR/scrcpy.tar.gz" || fail "Impossible de télécharger scrcpy v${SCRCPY_VERSION}"
+    sudo rm -rf "$SCRCPY_DIR"
+    sudo mkdir -p "$SCRCPY_DIR"
+    sudo tar xzf "$TMP_DIR/scrcpy.tar.gz" -C "$SCRCPY_DIR" --strip-components=1
+    sudo ln -sf "$SCRCPY_DIR/scrcpy" /usr/local/bin/scrcpy
+    sudo ln -sf "$SCRCPY_DIR/adb" /usr/local/bin/adb 2>/dev/null || true
+    rm -rf "$TMP_DIR"
+    ok "scrcpy v${SCRCPY_VERSION} installé dans $SCRCPY_DIR"
 fi
 
 # ─── ADB ──────────────────────────────────────────────────────────────────

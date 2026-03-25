@@ -4,13 +4,20 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export default function Titlebar() {
   const win = getCurrentWindow();
 
+  const handleDrag = (e: React.MouseEvent) => {
+    // Prevent drag when clicking on buttons (no-drag elements)
+    if ((e.target as HTMLElement).closest(".no-drag")) return;
+    e.preventDefault();
+    win.startDragging();
+  };
+
   return (
     <div
+      onMouseDown={handleDrag}
       className="
         flex items-center justify-between h-10 px-4 flex-shrink-0
         bg-slate-950 dark:bg-slate-950 light:bg-white
         border-b border-slate-800 dark:border-slate-800 light:border-slate-200
-        drag-region
       "
     >
       {/* Logo + nom */}
