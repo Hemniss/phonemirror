@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "deb", "appimage", "app"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,6 +37,22 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": []
+    "resources": {
+      "resources/scrcpy/": "scrcpy/"
+    },
+    "shortDescription": "Streamez votre téléphone Android sur votre PC",
+    "longDescription": "PhoneMirror affiche et contrôle l'écran de votre téléphone Android depuis votre ordinateur, en USB ou en WiFi. scrcpy et adb sont inclus : aucune installation supplémentaire n'est nécessaire.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["French", "English"],
+        "displayLanguageSelector": true
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libgtk-3-0", "libwebkit2gtk-4.1-0"]
+      }
+    }
   }
 }
