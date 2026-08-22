@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use crate::process;
 use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +52,14 @@ pub fn get_adb_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         }
     }
 
-    Err("ADB introuvable. Installez-le via Homebrew : brew install android-platform-tools".to_string())
+    #[cfg(target_os = "windows")]
+    const HINT: &str = "L'installation de PhoneMirror semble incomplète : réinstallez l'application.";
+    #[cfg(target_os = "macos")]
+    const HINT: &str = "Installez-le via Homebrew : brew install android-platform-tools";
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    const HINT: &str = "Installez-le : sudo apt install android-tools-adb";
+
+    Err(format!("ADB introuvable. {HINT}"))
 }
 
 /// Liste les appareils Android connectés (USB + WiFi).
@@ -60,7 +67,7 @@ pub fn get_adb_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 pub async fn list_devices(app: AppHandle) -> Result<Vec<Device>, String> {
     let adb = get_adb_path(&app)?;
 
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["devices", "-l"])
         .output()
         .map_err(|e| format!("Erreur ADB: {e}"))?;
@@ -132,7 +139,7 @@ fn get_device_info(
         "printf '%s\\n%s\\n%s\\n' \"$(getprop ro.product.model)\" \"$(getprop ro.product.name)\" \"$(getprop ro.build.version.release)\""
     };
 
-    let Ok(output) = Command::new(adb).args(["-s", serial, "shell", cmd]).output() else {
+    let Ok(output) = process::command(adb).args(["-s", serial, "shell", cmd]).output() else {
         return ("Inconnu".to_string(), String::new(), String::new(), None);
     };
 
@@ -173,7 +180,7 @@ pub async fn connect_wireless(app: AppHandle, ip: String, port: u16) -> Result<S
     let adb = get_adb_path(&app)?;
     let addr = format!("{ip}:{port}");
 
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["connect", &addr])
         .output()
         .map_err(|e| e.to_string())?;
@@ -190,7 +197,7 @@ pub async fn connect_wireless(app: AppHandle, ip: String, port: u16) -> Result<S
 #[tauri::command]
 pub async fn disconnect_device(app: AppHandle, serial: String) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    Command::new(&adb)
+    process::command(&adb)
         .args(["disconnect", &serial])
         .output()
         .map_err(|e| e.to_string())?;
@@ -201,7 +208,7 @@ pub async fn disconnect_device(app: AppHandle, serial: String) -> Result<(), Str
 #[tauri::command]
 pub async fn enable_tcpip(app: AppHandle, serial: String, port: u16) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["-s", &serial, "tcpip", &port.to_string()])
         .output()
         .map_err(|e| e.to_string())?;
@@ -224,7 +231,7 @@ pub async fn pair_device(
     let adb = get_adb_path(&app)?;
     let addr = format!("{ip}:{port}");
 
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["pair", &addr, &code])
         .output()
         .map_err(|e| e.to_string())?;
