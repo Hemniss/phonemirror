@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function ProfileSelector({ device }: Props) {
-  const { profiles, setMirroring } = useAppStore();
+  const { profiles, setMirroring, defaultSettings } = useAppStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -41,6 +41,8 @@ export default function ProfileSelector({ device }: Props) {
       enable_audio: profile.enable_audio,
       always_on_top: profile.always_on_top,
       fullscreen: false,
+      // Les profils ne couvrent pas ce réglage : on suit la préférence globale.
+      borderless: defaultSettings.borderless,
       show_touches: profile.show_touches,
       rotation: null,
       record_path: null,

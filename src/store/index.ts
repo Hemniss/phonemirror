@@ -49,6 +49,7 @@ const DEFAULT_SETTINGS: DefaultSettings = {
   always_on_top: false,
   show_touches: false,
   fullscreen: false,
+  borderless: true,
 };
 
 export const useAppStore = create<AppState>()(
@@ -102,6 +103,20 @@ export const useAppStore = create<AppState>()(
         theme: state.theme,
         defaultSettings: state.defaultSettings,
       }),
+      // Les réglages persistés par une version antérieure ne contiennent pas
+      // les clés ajoutées depuis. Sans cette fusion, elles vaudraient
+      // `undefined` et seraient rejetées par le backend.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppState>;
+        return {
+          ...current,
+          ...saved,
+          defaultSettings: {
+            ...current.defaultSettings,
+            ...(saved.defaultSettings ?? {}),
+          },
+        };
+      },
     }
   )
 );
