@@ -33,10 +33,26 @@ pub fn get_adb_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         return Ok(bundled);
     }
 
-    which::which("adb").map_err(|_| {
-        "ADB introuvable. Lancez le script scripts/download-scrcpy.sh pour télécharger scrcpy."
-            .to_string()
-    })
+    // Chercher dans le PATH (fonctionne quand lancé depuis un terminal)
+    if let Ok(p) = which::which("adb") {
+        return Ok(p);
+    }
+
+    // Sur macOS, les .app lancées depuis le Finder n'héritent pas du PATH shell.
+    // Chercher explicitement dans les emplacements Homebrew (Apple Silicon puis Intel).
+    #[cfg(target_os = "macos")]
+    for candidate in &[
+        "/opt/homebrew/bin/adb",
+        "/usr/local/bin/adb",
+        "/opt/homebrew/Caskroom/android-platform-tools/latest/adb",
+    ] {
+        let p = std::path::Path::new(candidate);
+        if p.exists() {
+            return Ok(p.to_path_buf());
+        }
+    }
+
+    Err("ADB introuvable. Installez-le via Homebrew : brew install android-platform-tools".to_string())
 }
 
 /// Liste les appareils Android connectés (USB + WiFi).

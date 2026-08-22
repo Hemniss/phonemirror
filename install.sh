@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PhoneMirror — Script d'installation des dépendances (Linux)
+# PhoneMirror — Script d'installation des dépendances (Linux / macOS)
 # Usage : bash install.sh
 
 set -euo pipefail
@@ -16,8 +16,96 @@ echo -e "\n${CYAN}============================================${NC}"
 echo -e "${CYAN}   PhoneMirror — Installateur de dependances${NC}"
 echo -e "${CYAN}============================================${NC}\n"
 
+# ─── Détection de l'OS ────────────────────────────────────────────────────
+OS="$(uname -s)"
+
+# ══════════════════════════════════════════════════════════════════════════
+# macOS
+# ══════════════════════════════════════════════════════════════════════════
+if [ "$OS" = "Darwin" ]; then
+    step "Système détecté : macOS"
+
+    # ─── Homebrew ─────────────────────────────────────────────────────────
+    step "Vérification de Homebrew..."
+    if command -v brew &>/dev/null; then
+        skip "Homebrew déjà installé ($(brew --version | head -1))"
+    else
+        echo "   Installation de Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # Ajouter brew au PATH pour la suite du script (Apple Silicon vs Intel)
+        if [ -f /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [ -f /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+        ok "Homebrew installé"
+    fi
+
+    # ─── Node.js ──────────────────────────────────────────────────────────
+    step "Vérification de Node.js..."
+    if command -v node &>/dev/null; then
+        skip "Node.js déjà installé ($(node --version))"
+    else
+        brew install node
+        ok "Node.js installé ($(node --version))"
+    fi
+
+    # ─── Rust ─────────────────────────────────────────────────────────────
+    step "Vérification de Rust..."
+    if command -v cargo &>/dev/null; then
+        skip "Rust déjà installé ($(rustc --version))"
+    else
+        echo "   Installation de Rust via rustup..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+        source "$HOME/.cargo/env"
+        ok "Rust installé ($(rustc --version))"
+    fi
+    if ! command -v cargo &>/dev/null; then
+        source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
+    fi
+
+    # ─── scrcpy + adb ─────────────────────────────────────────────────────
+    step "Installation de scrcpy et ADB..."
+    if command -v scrcpy &>/dev/null; then
+        skip "scrcpy déjà installé ($(scrcpy --version 2>&1 | head -1))"
+    else
+        brew install scrcpy
+        ok "scrcpy installé"
+    fi
+    if command -v adb &>/dev/null; then
+        skip "ADB déjà installé ($(adb version 2>&1 | head -1))"
+    else
+        # scrcpy installe adb via android-platform-tools, mais au cas où :
+        brew install android-platform-tools
+        ok "ADB installé"
+    fi
+
+    # ─── npm install ──────────────────────────────────────────────────────
+    step "Installation des dépendances npm..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR"
+    npm install
+    ok "Dépendances npm installées"
+
+    echo -e "\n${GREEN}============================================${NC}"
+    echo -e "${GREEN}   Installation terminée ! (macOS)${NC}"
+    echo -e "${GREEN}============================================${NC}"
+    echo -e "\nPour lancer l'application en mode dev :"
+    echo -e "   ${CYAN}./run.sh dev${NC}"
+    echo -e "\nPour compiler l'application :"
+    echo -e "   ${CYAN}./run.sh build${NC}"
+    echo -e "\n${YELLOW}Note :${NC} Si vous venez d'installer Rust, rechargez votre terminal :"
+    echo -e "   ${CYAN}source \$HOME/.cargo/env${NC}"
+    echo ""
+    exit 0
+fi
+
+# ══════════════════════════════════════════════════════════════════════════
+# Linux
+# ══════════════════════════════════════════════════════════════════════════
+
 # ─── Détection du gestionnaire de paquets ─────────────────────────────────
-step "Détection du système..."
+step "Détection du système Linux..."
 if command -v apt-get &>/dev/null; then
     PKG="apt"
 elif command -v dnf &>/dev/null; then
@@ -42,8 +130,15 @@ step "Installation des dépendances système (Tauri / WebKit)..."
 case "$PKG" in
     apt)
         sudo apt-get update -qq || echo -e "   ${YELLOW}[!!]${NC} apt-get update a retourné des avertissements (ignorés)"
+        # Ubuntu récent remplace libappindicator3 par Ayatana (les deux sont en conflit).
+        # On choisit le paquet réellement disponible pour éviter la rupture de dépendances.
+        if apt-cache show libayatana-appindicator3-dev &>/dev/null; then
+            APPINDICATOR_PKG="libayatana-appindicator3-dev"
+        else
+            APPINDICATOR_PKG="libappindicator3-dev"
+        fi
         pkg_install \
-            libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev \
+            libgtk-3-dev libwebkit2gtk-4.1-dev "$APPINDICATOR_PKG" \
             librsvg2-dev patchelf libxdo-dev curl build-essential
         ;;
     dnf)

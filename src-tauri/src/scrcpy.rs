@@ -43,9 +43,22 @@ fn get_scrcpy_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         return Ok(bundled);
     }
 
-    which::which("scrcpy").map_err(|_| {
-        "scrcpy introuvable. Lancez scripts/download-scrcpy.sh pour le télécharger.".to_string()
-    })
+    // Chercher dans le PATH (fonctionne quand lancé depuis un terminal)
+    if let Ok(p) = which::which("scrcpy") {
+        return Ok(p);
+    }
+
+    // Sur macOS, les .app lancées depuis le Finder n'héritent pas du PATH shell.
+    // Chercher explicitement dans les emplacements Homebrew (Apple Silicon puis Intel).
+    #[cfg(target_os = "macos")]
+    for candidate in &["/opt/homebrew/bin/scrcpy", "/usr/local/bin/scrcpy"] {
+        let p = std::path::Path::new(candidate);
+        if p.exists() {
+            return Ok(p.to_path_buf());
+        }
+    }
+
+    Err("scrcpy introuvable. Installez-le via Homebrew : brew install scrcpy".to_string())
 }
 
 /// Démarre le mirroring d'un appareil avec la configuration donnée.
@@ -83,6 +96,8 @@ pub async fn start_mirror(
     args.push("--render-driver=direct3d".to_string());
     #[cfg(target_os = "linux")]
     args.push("--render-driver=opengl".to_string());
+    #[cfg(target_os = "macos")]
+    args.push("--render-driver=metal".to_string());
 
     if config.enable_audio {
         args.push("--audio-source=output".to_string());
@@ -120,8 +135,24 @@ pub async fn start_mirror(
         args.push(path.clone());
     }
 
+    let adb = get_adb_path(&app)?;
+
+    // Construire un PATH enrichi pour que scrcpy trouve adb même depuis un .app macOS
+    let enriched_path = {
+        let current = std::env::var("PATH").unwrap_or_default();
+        let extra = "/opt/homebrew/bin:/usr/local/bin:/opt/homebrew/sbin";
+        if current.is_empty() {
+            extra.to_string()
+        } else {
+            format!("{extra}:{current}")
+        }
+    };
+
     let mut child = Command::new(&scrcpy)
         .args(&args)
+        // Indiquer explicitement le chemin de adb à scrcpy via sa variable d'env dédiée
+        .env("ADB", &adb)
+        .env("PATH", &enriched_path)
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Impossible de démarrer scrcpy: {e}"))?;

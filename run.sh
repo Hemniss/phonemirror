@@ -12,11 +12,20 @@ if ! command -v cargo &>/dev/null; then
     source "$HOME/.cargo/env" 2>/dev/null || true
 fi
 
-# Trouver le binaire de production
+# Trouver le binaire de production (ou le .app sur macOS)
 find_binary() {
     local bin="$SCRIPT_DIR/src-tauri/target/release/phonemirror"
     if [ -f "$bin" ] && [ -x "$bin" ]; then
         echo "$bin"
+        return 0
+    fi
+    return 1
+}
+
+find_app_bundle() {
+    local app="$SCRIPT_DIR/src-tauri/target/release/bundle/macos/PhoneMirror.app"
+    if [ -d "$app" ]; then
+        echo "$app"
         return 0
     fi
     return 1
@@ -39,11 +48,22 @@ case "$MODE" in
         exec "$BIN"
         ;;
     start)
+        if [ "$(uname -s)" = "Darwin" ]; then
+            APP=$(find_app_bundle) && { open "$APP"; exit 0; } || true
+        fi
         BIN=$(find_binary) || { echo "❌ Binaire introuvable. Lancez d'abord : ./run.sh build"; exit 1; }
         echo "🚀 Lancement de PhoneMirror..."
         exec "$BIN"
         ;;
     install)
+        if [ "$(uname -s)" = "Darwin" ]; then
+            APP=$(find_app_bundle) || { echo "❌ Bundle .app introuvable. Lancez d'abord : ./run.sh build"; exit 1; }
+            echo "📦 Copie de PhoneMirror.app dans /Applications..."
+            cp -r "$APP" /Applications/PhoneMirror.app
+            echo "✅ PhoneMirror installé dans /Applications."
+            echo "   Vous pouvez le lancer depuis le Launchpad ou Spotlight."
+            exit 0
+        fi
         BIN=$(find_binary) || { echo "❌ Binaire introuvable. Lancez d'abord : ./run.sh build"; exit 1; }
         ICON="$SCRIPT_DIR/assets/app-icon.png"
         DESKTOP_FILE="$HOME/.local/share/applications/phonemirror.desktop"

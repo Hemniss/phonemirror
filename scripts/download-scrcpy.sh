@@ -74,9 +74,15 @@ case "$OS" in
         fi
         ;;
     Darwin*)
-        # macOS — scrcpy n'a pas de release officielle binaire macOS
-        echo "⚠️  macOS: Installez scrcpy via Homebrew: brew install scrcpy"
+        # macOS — pas de release binaire officielle, on s'appuie sur le PATH (Homebrew)
+        if command -v scrcpy &>/dev/null; then
+            echo "✅ scrcpy trouvé dans PATH: $(which scrcpy)"
+        else
+            echo "⚠️  scrcpy introuvable. Installez-le via Homebrew :"
+            echo "   brew install scrcpy"
+        fi
         echo "   Le build utilisera scrcpy du PATH système."
+        exit 0
         ;;
     MINGW*|MSYS*|CYGWIN*)
         download_windows
@@ -89,4 +95,4 @@ esac
 
 echo ""
 echo "📋 Contenu de $DEST:"
-ls -la "$DEST/"
+ls -la "$DEST/" 2>/dev/null || echo "   (dossier vide ou inexistant)"
