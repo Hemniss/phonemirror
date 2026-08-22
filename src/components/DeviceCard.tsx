@@ -54,6 +54,7 @@ export default function DeviceCard({ device, onRefresh }: Props) {
           enable_audio: defaultSettings.enable_audio,
           always_on_top: defaultSettings.always_on_top,
           fullscreen: defaultSettings.fullscreen,
+          borderless: defaultSettings.borderless,
           show_touches: defaultSettings.show_touches,
           rotation: null,
           record_path: null,

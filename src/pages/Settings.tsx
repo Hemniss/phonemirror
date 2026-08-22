@@ -121,6 +121,13 @@ export default function Settings() {
             onChange={(v) => updateDefaultSettings({ fullscreen: v })}
             tooltip="Ouvre la fenêtre scrcpy directement en plein écran. Vous pouvez basculer à tout moment avec la touche F dans la fenêtre de mirroring."
           />
+          <ToggleField
+            label="Masquer la barre de titre"
+            description="Affiche uniquement l'écran du téléphone, sans bandeau"
+            value={defaultSettings.borderless}
+            onChange={(v) => updateDefaultSettings({ borderless: v })}
+            tooltip="Supprime le bandeau et les bordures de la fenêtre de mirroring : seul l'écran du téléphone reste visible. Sans barre de titre, la fenêtre ne peut plus être déplacée à la souris — désactivez cette option si vous avez besoin de la repositionner."
+          />
         </SettingsSection>
 
         {/* Interactions */}

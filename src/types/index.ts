@@ -19,6 +19,7 @@ export interface MirrorConfig {
   enable_audio: boolean;
   always_on_top: boolean;
   fullscreen: boolean;
+  borderless: boolean;
   show_touches: boolean;
   rotation: number | null;
   record_path: string | null;
@@ -51,4 +52,5 @@ export interface DefaultSettings {
   always_on_top: boolean;
   show_touches: boolean;
   fullscreen: boolean;
+  borderless: boolean;
 }

@@ -21,6 +21,11 @@ pub struct MirrorConfig {
     pub enable_audio: bool,
     pub always_on_top: bool,
     pub fullscreen: bool,
+    /// Masque la barre de titre de la fenêtre scrcpy.
+    /// `serde(default)` : les réglages persistés avant l'ajout de ce champ
+    /// ne le contiennent pas et échoueraient à la désérialisation.
+    #[serde(default)]
+    pub borderless: bool,
     pub show_touches: bool,
     pub rotation: Option<u32>,
     pub record_path: Option<String>,
@@ -119,6 +124,10 @@ pub async fn start_mirror(
 
     if config.fullscreen {
         args.push("--fullscreen".to_string());
+    }
+
+    if config.borderless {
+        args.push("--window-borderless".to_string());
     }
 
     if config.show_touches {

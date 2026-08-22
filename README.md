@@ -155,6 +155,7 @@ Les profils permettent de sauvegarder des configurations (résolution, FPS, déb
 | Audio | Transmet le son du téléphone (Android 11+) |
 | Toujours au premier plan | La fenêtre scrcpy reste visible au-dessus des autres |
 | Plein écran au démarrage | Lance scrcpy directement en plein écran |
+| Masquer la barre de titre | N'affiche que l'écran du téléphone, sans bandeau ni bordure (activé par défaut) |
 | Afficher les touches | Cercles visuels à chaque toucher (utile pour enregistrements) |
 
 > Le rendu est optimisé automatiquement selon la plateforme : **Direct3D** sur Windows, **OpenGL** sur Linux.
