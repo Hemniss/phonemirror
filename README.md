@@ -14,6 +14,33 @@
 
 ## Installation
 
+### Utilisateurs — installeur prêt à l'emploi
+
+Rendez-vous sur la page [**Releases**](https://github.com/Hemniss/phonemirror/releases)
+et téléchargez le fichier correspondant à votre système.
+
+| Système | Fichier | Remarque |
+|---|---|---|
+| Windows | `PhoneMirror_x.y.z_x64-setup.exe` | Aucun droit administrateur requis |
+| Linux (Debian/Ubuntu) | `.deb` | `sudo apt install ./PhoneMirror_*.deb` |
+| Linux (autre) | `.AppImage` | `chmod +x` puis double-clic |
+
+**scrcpy et adb sont inclus dans l'installeur** : rien d'autre à installer.
+
+Sur Windows, l'application n'étant pas signée par un certificat payant,
+SmartScreen affiche un avertissement au premier lancement. Cliquez sur
+**Informations complémentaires** puis **Exécuter quand même**.
+
+Il reste à activer le débogage USB sur le téléphone — voir
+[Prérequis téléphone Android](#prérequis-téléphone-android) plus bas.
+
+---
+
+## Compiler depuis les sources (développeurs)
+
+Cette section ne concerne que le développement. Pour simplement utiliser
+l'application, servez-vous de l'installeur ci-dessus.
+
 ### Windows
 
 1. Clic droit sur `install.ps1` → **Exécuter avec PowerShell** (en tant qu'administrateur)

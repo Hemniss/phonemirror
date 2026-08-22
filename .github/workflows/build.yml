@@ -67,19 +67,31 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "PhoneMirror ${{ github.ref_name }}"
+          # Vide hors tag : tauri-action se contente alors de compiler, sans
+          # créer de release. Indispensable pour les essais via workflow_dispatch.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('PhoneMirror {0}', github.ref_name) || '' }}
           releaseBody: |
             ## PhoneMirror ${{ github.ref_name }}
 
             Streamez votre téléphone Android sur votre PC.
 
+            scrcpy et adb sont inclus dans l'installeur : aucune installation
+            supplémentaire n'est nécessaire.
+
             ### Téléchargements
-            - **Windows** : `.msi` ou `.exe`
+            - **Windows** : le fichier `.exe`
             - **Linux** : `.deb` ou `.AppImage`
 
             ### Prérequis
-            - Activer le débogage USB sur votre téléphone Android
+            Activer le débogage USB sur le téléphone Android :
+            Paramètres > À propos > appuyer 7 fois sur « Numéro de build »,
+            puis Options pour les développeurs > Débogage USB.
+
+            ### Windows
+            L'application n'est pas signée par un certificat payant : Windows
+            affiche un avertissement SmartScreen au premier lancement.
+            Cliquer sur « Informations complémentaires » puis « Exécuter quand même ».
           releaseDraft: true
           prerelease: false
 
