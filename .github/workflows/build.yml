@@ -21,6 +21,12 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    # Le token par défaut du dépôt est en lecture seule : sans cela, la
+    # création de la release échoue sur « Resource not accessible by
+    # integration », alors même que la compilation a réussi.
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
