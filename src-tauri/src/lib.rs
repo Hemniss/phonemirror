@@ -1,4 +1,5 @@
 mod adb;
+mod process;
 mod profiles;
 mod scrcpy;
 

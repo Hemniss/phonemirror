@@ -2,7 +2,8 @@ use crate::adb::get_adb_path;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Read;
-use std::process::{Child, Command, Stdio};
+use crate::process;
+use std::process::{Child, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
@@ -58,7 +59,14 @@ fn get_scrcpy_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         }
     }
 
-    Err("scrcpy introuvable. Installez-le via Homebrew : brew install scrcpy".to_string())
+    #[cfg(target_os = "windows")]
+    const HINT: &str = "L'installation de PhoneMirror semble incomplète : réinstallez l'application.";
+    #[cfg(target_os = "macos")]
+    const HINT: &str = "Installez-le via Homebrew : brew install scrcpy";
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    const HINT: &str = "Installez-le : sudo apt install scrcpy";
+
+    Err(format!("scrcpy introuvable. {HINT}"))
 }
 
 /// Démarre le mirroring d'un appareil avec la configuration donnée.
@@ -137,23 +145,27 @@ pub async fn start_mirror(
 
     let adb = get_adb_path(&app)?;
 
-    // Construire un PATH enrichi pour que scrcpy trouve adb même depuis un .app macOS
-    let enriched_path = {
+    let mut cmd = process::command(&scrcpy);
+    cmd.args(&args)
+        // Indiquer explicitement le chemin de adb à scrcpy via sa variable d'env dédiée
+        .env("ADB", &adb)
+        .stderr(Stdio::piped());
+
+    // Sur macOS uniquement : enrichir le PATH pour que scrcpy trouve adb depuis un .app
+    // lancé par le Finder. Le séparateur `:` est propre aux systèmes UNIX.
+    #[cfg(target_os = "macos")]
+    {
         let current = std::env::var("PATH").unwrap_or_default();
         let extra = "/opt/homebrew/bin:/usr/local/bin:/opt/homebrew/sbin";
-        if current.is_empty() {
+        let enriched = if current.is_empty() {
             extra.to_string()
         } else {
             format!("{extra}:{current}")
-        }
-    };
+        };
+        cmd.env("PATH", enriched);
+    }
 
-    let mut child = Command::new(&scrcpy)
-        .args(&args)
-        // Indiquer explicitement le chemin de adb à scrcpy via sa variable d'env dédiée
-        .env("ADB", &adb)
-        .env("PATH", &enriched_path)
-        .stderr(Stdio::piped())
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Impossible de démarrer scrcpy: {e}"))?;
 
@@ -221,7 +233,7 @@ pub async fn push_file(
     remote_path: String,
 ) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["-s", &serial, "push", &local_path, &remote_path])
         .output()
         .map_err(|e| e.to_string())?;
@@ -241,7 +253,7 @@ pub async fn pull_file(
     local_path: String,
 ) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    let output = Command::new(&adb)
+    let output = process::command(&adb)
         .args(["-s", &serial, "pull", &remote_path, &local_path])
         .output()
         .map_err(|e| e.to_string())?;
