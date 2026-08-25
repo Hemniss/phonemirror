@@ -18,6 +18,12 @@ jobs:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             platform: linux
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            platform: macos-intel
 
     runs-on: ${{ matrix.os }}
 
@@ -87,6 +93,8 @@ jobs:
 
             ### Téléchargements
             - **Windows** : le fichier `.exe`
+            - **macOS Apple Silicon** (M1 et suivants) : `*_aarch64.dmg`
+            - **macOS Intel** : `*_x64.dmg`
             - **Linux** : `.deb` ou `.AppImage`
 
             ### Prérequis
@@ -98,6 +106,17 @@ jobs:
             L'application n'est pas signée par un certificat payant : Windows
             affiche un avertissement SmartScreen au premier lancement.
             Cliquer sur « Informations complémentaires » puis « Exécuter quand même ».
+
+            ### macOS
+            L'application n'est pas notarisée par Apple. Après avoir glissé
+            PhoneMirror dans Applications, ouvrir le Terminal et lancer :
+
+            ```
+            xattr -cr /Applications/PhoneMirror.app
+            ```
+
+            Sans cette commande, macOS refuse de l'ouvrir. Elle retire
+            l'attribut de quarantaine posé sur tout fichier téléchargé.
           releaseDraft: true
           prerelease: false
 
@@ -111,4 +130,5 @@ jobs:
             src-tauri/target/release/bundle/**/*.exe
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.dmg
           retention-days: 7

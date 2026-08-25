@@ -22,6 +22,8 @@ et téléchargez le fichier correspondant à votre système.
 | Système | Fichier | Remarque |
 |---|---|---|
 | Windows | `PhoneMirror_x.y.z_x64-setup.exe` | Aucun droit administrateur requis |
+| macOS Apple Silicon | `PhoneMirror_x.y.z_aarch64.dmg` | M1 et suivants |
+| macOS Intel | `PhoneMirror_x.y.z_x64.dmg` | |
 | Linux (Debian/Ubuntu) | `.deb` | `sudo apt install ./PhoneMirror_*.deb` |
 | Linux (autre) | `.AppImage` | `chmod +x` puis double-clic |
 
@@ -30,6 +32,16 @@ et téléchargez le fichier correspondant à votre système.
 Sur Windows, l'application n'étant pas signée par un certificat payant,
 SmartScreen affiche un avertissement au premier lancement. Cliquez sur
 **Informations complémentaires** puis **Exécuter quand même**.
+
+Sur macOS, l'application n'est pas notarisée par Apple. Après avoir glissé
+PhoneMirror dans le dossier Applications, ouvrez le Terminal et lancez :
+
+```bash
+xattr -cr /Applications/PhoneMirror.app
+```
+
+Sans cette commande, macOS refuse d'ouvrir l'application. Elle retire
+l'attribut de quarantaine que le système pose sur tout fichier téléchargé.
 
 Il reste à activer le débogage USB sur le téléphone — voir
 [Prérequis téléphone Android](#prérequis-téléphone-android) plus bas.

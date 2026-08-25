@@ -40,6 +40,12 @@ case "$MODE" in
         ;;
     build)
         echo "📦 Build de production..."
+        # Sur macOS, la création du DMG pilote le Finder via AppleScript, ce qui
+        # expire hors session graphique interactive. CI=true fait sauter cette
+        # étape purement cosmétique à create-dmg.
+        if [ "$(uname -s)" = "Darwin" ]; then
+            export CI=true
+        fi
         npm run tauri build
         echo ""
         echo "✅ Build terminé !"

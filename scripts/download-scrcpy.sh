@@ -115,6 +115,31 @@ download_windows() {
     echo "✅ scrcpy Windows installé dans $DEST"
 }
 
+download_macos() {
+    # Les archives macOS sont publiées par architecture : arm64 côté uname,
+    # aarch64 côté nom de fichier.
+    local arch
+    case "$ARCH" in
+        arm64|aarch64) arch="aarch64" ;;
+        x86_64)        arch="x86_64" ;;
+        *) echo "❌ Architecture macOS non gérée : $ARCH"; exit 1 ;;
+    esac
+
+    local name="scrcpy-macos-${arch}-v${SCRCPY_VERSION}.tar.gz"
+    local tarball="$TMP/$name"
+
+    echo "⬇️  Téléchargement macOS : $BASE_URL/$name"
+    curl -fsSL -o "$tarball" "$BASE_URL/$name"
+    verify_checksum "$tarball" "$name"
+
+    echo "📦 Extraction..."
+    tar -xzf "$tarball" -C "$TMP"
+    install_from "$TMP/scrcpy-macos-${arch}-v${SCRCPY_VERSION}"
+    chmod +x "$DEST/scrcpy" "$DEST/adb" 2>/dev/null || true
+
+    echo "✅ scrcpy macOS ($arch) installé dans $DEST"
+}
+
 download_linux() {
     local name="scrcpy-linux-x86_64-v${SCRCPY_VERSION}.tar.gz"
     local tarball="$TMP/$name"
@@ -146,19 +171,7 @@ case "$OS" in
         download_windows
         ;;
     Darwin*)
-        # Pas d'embarquement sur macOS : l'app utilise scrcpy du PATH (Homebrew).
-        if command -v scrcpy >/dev/null 2>&1; then
-            echo "✅ scrcpy trouvé dans le PATH : $(command -v scrcpy)"
-        else
-            echo "⚠️  scrcpy introuvable. Installez-le : brew install scrcpy"
-        fi
-        # Tauri échoue si le dossier de ressources déclaré est vide : on y laisse
-        # un marqueur pour que le build macOS local aboutisse malgré tout.
-        printf '%s\n' \
-            "scrcpy n'est pas embarqué dans les builds macOS." \
-            "Installez-le : brew install scrcpy android-platform-tools" \
-            > "$DEST/README.txt"
-        exit 0
+        download_macos
         ;;
     *)
         echo "❌ OS non reconnu : $OS"
