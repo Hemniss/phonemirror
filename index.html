@@ -4,15 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <script>
+      // Thème posé avant le premier rendu (évite un flash clair en sombre),
+      // et classe d'arrivée Orga Glass retirée par App après ~1,1 s.
+      (function () {
+        var t = "dark";
+        try {
+          var s = JSON.parse(localStorage.getItem("phonemirror-storage") || "{}");
+          if (s.state && s.state.theme) t = s.state.theme;
+        } catch (e) {}
+        document.documentElement.setAttribute("data-theme", t);
+        document.documentElement.classList.add("og-entering");
+      })();
+    </script>
     <title>PhoneMirror</title>
   </head>
-  <body>
+  <body class="og-root">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,26 +1,26 @@
 import { Monitor, Zap, Volume2, Layers, Hand, Sun, Moon, Gauge } from "lucide-react";
 import { useAppStore } from "../store";
 import Tooltip from "../components/Tooltip";
+import { delay } from "../lib/motion";
 
 export default function Settings() {
   const { defaultSettings, updateDefaultSettings, theme, toggleTheme } =
     useAppStore();
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-slate-800 dark:border-slate-800 light:border-slate-200">
-        <h1 className="text-lg font-semibold text-slate-100 dark:text-slate-100 light:text-slate-900">
-          Paramètres
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Configuration par défaut pour le mirroring
-        </p>
+    <div className="pm-page">
+      <div className="pm-page-h">
+        <div>
+          <h1 className="og-rise">Paramètres</h1>
+          <p className="og-rise" style={delay(40)}>Configuration par défaut pour le mirroring</p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-5 space-y-6">
+      <div className="pm-scroll space-y-4">
         {/* Affichage */}
         <SettingsSection
-          icon={<Monitor size={16} />}
+          index={0}
+          icon={<Monitor size={17} aria-hidden="true" />}
           title="Affichage"
           description="Qualité vidéo et résolution"
         >
@@ -50,7 +50,8 @@ export default function Settings() {
 
         {/* Performance */}
         <SettingsSection
-          icon={<Gauge size={16} />}
+          index={1}
+          icon={<Gauge size={17} aria-hidden="true" />}
           title="Performance & Latence"
           description="Optimisations pour réduire le délai d'affichage"
         >
@@ -69,7 +70,8 @@ export default function Settings() {
 
         {/* Réseau */}
         <SettingsSection
-          icon={<Zap size={16} />}
+          index={2}
+          icon={<Zap size={17} aria-hidden="true" />}
           title="Réseau"
           description="Débit et compression"
         >
@@ -88,7 +90,8 @@ export default function Settings() {
 
         {/* Audio */}
         <SettingsSection
-          icon={<Volume2 size={16} />}
+          index={3}
+          icon={<Volume2 size={17} aria-hidden="true" />}
           title="Audio"
           description="Transmission du son (Android 11+)"
         >
@@ -103,7 +106,8 @@ export default function Settings() {
 
         {/* Fenêtre */}
         <SettingsSection
-          icon={<Layers size={16} />}
+          index={4}
+          icon={<Layers size={17} aria-hidden="true" />}
           title="Fenêtre de mirroring"
           description="Comportement de la fenêtre scrcpy"
         >
@@ -132,7 +136,8 @@ export default function Settings() {
 
         {/* Interactions */}
         <SettingsSection
-          icon={<Hand size={16} />}
+          index={5}
+          icon={<Hand size={17} aria-hidden="true" />}
           title="Interactions"
           description="Affichage des touches et interactions"
         >
@@ -147,29 +152,32 @@ export default function Settings() {
 
         {/* Apparence */}
         <SettingsSection
-          icon={theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
+          index={6}
+          icon={theme === "dark" ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
           title="Apparence"
           description="Thème de l'interface"
         >
-          <div className="flex gap-3 px-5 py-4">
-            <ThemeButton
-              label="Sombre"
-              icon={<Moon size={16} />}
-              active={theme === "dark"}
-              onClick={() => theme === "light" && toggleTheme()}
-            />
-            <ThemeButton
-              label="Clair"
-              icon={<Sun size={16} />}
-              active={theme === "light"}
-              onClick={() => theme === "dark" && toggleTheme()}
-            />
+          <div className="py-3">
+            <div className="og-seg" role="tablist" aria-label="Thème">
+              <ThemeButton
+                label="Sombre"
+                icon={<Moon size={15} aria-hidden="true" />}
+                active={theme === "dark"}
+                onClick={() => theme === "light" && toggleTheme()}
+              />
+              <ThemeButton
+                label="Clair"
+                icon={<Sun size={15} aria-hidden="true" />}
+                active={theme === "light"}
+                onClick={() => theme === "dark" && toggleTheme()}
+              />
+            </div>
           </div>
         </SettingsSection>
 
         {/* Version */}
         <div className="pt-2 pb-6">
-          <p className="text-xs text-slate-600 text-center">
+          <p className="text-xs text-fg-2 text-center">
             PhoneMirror v0.1.0 — Propulsé par scrcpy
           </p>
         </div>
@@ -185,26 +193,24 @@ function SettingsSection({
   title,
   description,
   children,
+  index = 0,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   children: React.ReactNode;
+  index?: number;
 }) {
   return (
-    <section className="rounded-xl border border-slate-800 dark:border-slate-800 light:border-slate-200 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 bg-slate-900/50 dark:bg-slate-900/50 light:bg-slate-50">
-        <span className="text-brand-400">{icon}</span>
+    <section className="og-glass og-card og-rise" style={{ paddingTop: 18, paddingBottom: 8, ...delay(110, index) }}>
+      <div className="flex items-center gap-3 mb-1">
+        <div className="og-ic">{icon}</div>
         <div>
-          <h2 className="text-sm font-semibold text-slate-200 dark:text-slate-200 light:text-slate-800">
-            {title}
-          </h2>
-          <p className="text-xs text-slate-500">{description}</p>
+          <h2 className="text-base font-bold text-fg">{title}</h2>
+          <p className="text-[13px] text-fg-2">{description}</p>
         </div>
       </div>
-      <div className="bg-slate-900 dark:bg-slate-900 light:bg-white divide-y divide-slate-800 dark:divide-slate-800 light:divide-slate-100">
-        {children}
-      </div>
+      <div className="divide-y divide-line">{children}</div>
     </section>
   );
 }
@@ -231,15 +237,13 @@ function SliderField({
   tooltip?: string;
 }) {
   return (
-    <div className="px-5 py-4">
+    <div className="py-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
-          <label className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700 font-medium">
-            {label}
-          </label>
+          <label className="text-sm text-fg font-semibold">{label}</label>
           {tooltip && <Tooltip content={tooltip} />}
         </div>
-        <span className="text-sm font-mono font-semibold text-brand-400">
+        <span className="text-sm font-bold text-fg og-num">
           {value}{unit}
         </span>
       </div>
@@ -250,7 +254,8 @@ function SliderField({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-slate-700 rounded-full appearance-none cursor-pointer accent-brand-500"
+        className="pm-range"
+        aria-label={label}
       />
       {presets && (
         <div className="flex gap-2 mt-3">
@@ -258,13 +263,8 @@ function SliderField({
             <button
               key={p}
               onClick={() => onChange(p)}
-              className={`
-                flex-1 py-1 rounded-md text-xs font-medium transition-colors
-                ${value === p
-                  ? "bg-brand-600 text-white"
-                  : "bg-slate-800 hover:bg-slate-700 text-slate-400 dark:bg-slate-800 light:bg-slate-100 light:text-slate-600 light:hover:bg-slate-200"
-                }
-              `}
+              aria-pressed={value === p}
+              className="og-chip og-num flex-1 justify-center"
             >
               {p}{unit}
             </button>
@@ -289,33 +289,21 @@ function ToggleField({
   tooltip?: string;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div>
         <div className="flex items-center gap-1.5">
-          <p className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700 font-medium">
-            {label}
-          </p>
+          <p className="text-sm text-fg font-semibold">{label}</p>
           {tooltip && <Tooltip content={tooltip} />}
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+        <p className="text-[13px] text-fg-2 mt-0.5">{description}</p>
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`
-          relative w-11 h-6 rounded-full transition-colors flex-shrink-0
-          ${value ? "bg-brand-600" : "bg-slate-700"}
-        `}
+        className="pm-switch"
         role="switch"
         aria-checked={value}
-      >
-        <span
-          className={`
-            absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm
-            transition-transform duration-200
-            ${value ? "translate-x-5" : "translate-x-0"}
-          `}
-        />
-      </button>
+        aria-label={label}
+      />
     </div>
   );
 }
@@ -332,18 +320,7 @@ function ThemeButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`
-        flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium
-        border transition-all
-        ${
-          active
-            ? "bg-brand-600 text-white border-brand-600"
-            : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-300 dark:bg-slate-800 light:bg-slate-50 light:border-slate-200 light:text-slate-600"
-        }
-      `}
-    >
+    <button role="tab" aria-selected={active} onClick={onClick}>
       {icon}
       {label}
     </button>

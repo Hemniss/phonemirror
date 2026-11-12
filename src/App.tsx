@@ -7,6 +7,7 @@ import Titlebar from "./components/Titlebar";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Profiles from "./pages/Profiles";
+import { markEntering } from "./lib/motion";
 
 function ResizeBorders() {
   const win = getCurrentWindow();
@@ -34,36 +35,47 @@ function ResizeBorders() {
 export default function App() {
   const { theme, currentPage } = useAppStore();
 
-  // Applique le thème sur le root
+  // Applique le thème (tokens Orga Glass sous [data-theme])
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // Arrivée de la première page, puis plus rien ne rejoue
+  useEffect(() => {
+    markEntering();
+  }, []);
 
   // Démarre le polling des appareils
   useDevices();
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 dark:bg-slate-950 light:bg-white theme-transition">
-      <ResizeBorders />
-      {/* Barre de titre personnalisée */}
-      <Titlebar />
-
-      {/* Corps principal */}
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          {currentPage === "dashboard" && <Dashboard />}
-          {currentPage === "profiles" && <Profiles />}
-          {currentPage === "settings" && <Settings />}
-        </main>
+    <>
+      {/* Décor : intérieur chaud flouté, dessiné une fois derrière le verre */}
+      <div className="og-scene" aria-hidden="true">
+        <i className="s-wall" />
+        <i className="s-window" />
+        <i className="s-lamp" />
+        <i className="s-shelf" />
+        <i className="s-plant" />
+        <i className="s-sofa" />
+        <i className="s-rug" />
+        <i className="s-floor" />
       </div>
-    </div>
+      <ResizeBorders />
+      <div className="pm-shell">
+        {/* Barre de titre personnalisée */}
+        <Titlebar />
+
+        {/* Fenêtre de verre : barre latérale cuivrée + page */}
+        <div className="og-window pm-window">
+          <Sidebar />
+          <main>
+            {currentPage === "dashboard" && <Dashboard />}
+            {currentPage === "profiles" && <Profiles />}
+            {currentPage === "settings" && <Settings />}
+          </main>
+        </div>
+      </div>
+    </>
   );
 }

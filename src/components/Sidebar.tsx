@@ -1,9 +1,9 @@
 import { LayoutDashboard, Bookmark, Settings, Sun, Moon, Wifi } from "lucide-react";
-import { clsx } from "clsx";
 import { useAppStore } from "../store";
 import type { Page } from "../types";
 import { useState } from "react";
 import ConnectionModal from "./ConnectionModal";
+import { withPageTransition } from "../lib/motion";
 
 interface NavItem {
   id: Page;
@@ -12,9 +12,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Tableau de bord", icon: <LayoutDashboard size={18} /> },
-  { id: "profiles", label: "Profils", icon: <Bookmark size={18} /> },
-  { id: "settings", label: "Paramètres", icon: <Settings size={18} /> },
+  { id: "dashboard", label: "Tableau de bord", icon: <LayoutDashboard size={17} aria-hidden="true" /> },
+  { id: "profiles", label: "Profils", icon: <Bookmark size={17} aria-hidden="true" /> },
+  { id: "settings", label: "Paramètres", icon: <Settings size={17} aria-hidden="true" /> },
 ];
 
 export default function Sidebar() {
@@ -23,79 +23,53 @@ export default function Sidebar() {
 
   const onlineCount = devices.filter((d) => d.state === "device").length;
 
+  const go = (page: Page) => {
+    if (page === currentPage) return;
+    withPageTransition(() => setCurrentPage(page));
+  };
+
   return (
     <>
-      <aside
-        className="
-          w-56 flex-shrink-0 flex flex-col
-          bg-slate-900 dark:bg-slate-900 light:bg-white
-          border-r border-slate-800 dark:border-slate-800 light:border-slate-200
-        "
-      >
-        {/* Statut appareils */}
-        <div className="px-4 py-3 border-b border-slate-800 dark:border-slate-800 light:border-slate-200">
-          <div className="flex items-center gap-2">
-            <span
-              className={clsx(
-                "w-2 h-2 rounded-full",
-                onlineCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-slate-600"
-              )}
-            />
-            <span className="text-xs text-slate-400 dark:text-slate-400 light:text-slate-500">
-              {onlineCount === 0
-                ? "Aucun appareil connecté"
-                : `${onlineCount} appareil${onlineCount > 1 ? "s" : ""} connecté${onlineCount > 1 ? "s" : ""}`}
-            </span>
-          </div>
+      <aside className="og-side">
+        {/* Marque */}
+        <div className="og-brand">
+          <b aria-hidden="true" />
+          PhoneMirror
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="og-nav" aria-label="Navigation principale">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className={clsx(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-                currentPage === item.id
-                  ? "bg-brand-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800 dark:hover:bg-slate-800 light:text-slate-600 light:hover:text-slate-900 light:hover:bg-slate-100"
-              )}
+              onClick={() => go(item.id)}
+              aria-current={currentPage === item.id ? "page" : undefined}
             >
+              <i className="og-ind" aria-hidden="true" />
               {item.icon}
-              {item.label}
+              <span>{item.label}</span>
+              {item.id === "dashboard" && onlineCount > 0 && (
+                <span className="og-badge og-num" aria-label={`${onlineCount} connecté${onlineCount > 1 ? "s" : ""}`}>
+                  {onlineCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
 
-        {/* Bas de sidebar */}
-        <div className="px-2 py-3 space-y-2 border-t border-slate-800 dark:border-slate-800 light:border-slate-200">
-          {/* Bouton connexion WiFi */}
-          <button
-            onClick={() => setShowConnect(true)}
-            className="
-              w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-              bg-brand-600/10 hover:bg-brand-600/20
-              text-brand-400 hover:text-brand-300
-              border border-brand-600/20 hover:border-brand-600/40
-              transition-all
-            "
-          >
-            <Wifi size={18} />
+        {/* Bas de barre */}
+        <div className="mt-auto flex flex-col gap-1 pt-3">
+          <p className="px-3 pb-2 text-xs text-white/85">
+            {onlineCount === 0
+              ? "Aucun appareil connecté"
+              : `${onlineCount} appareil${onlineCount > 1 ? "s" : ""} connecté${onlineCount > 1 ? "s" : ""}`}
+          </p>
+          <button onClick={() => setShowConnect(true)} className="pm-side-btn">
+            <Wifi size={17} aria-hidden="true" />
             Connexion WiFi
           </button>
-
-          {/* Toggle thème */}
-          <button
-            onClick={toggleTheme}
-            className="
-              w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-              text-slate-400 hover:text-slate-200
-              hover:bg-slate-800 dark:hover:bg-slate-800 light:hover:bg-slate-100
-              transition-colors
-            "
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          <button onClick={toggleTheme} className="pm-side-btn">
+            {theme === "dark" ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
             {theme === "dark" ? "Mode clair" : "Mode sombre"}
           </button>
         </div>

@@ -10,6 +10,7 @@ import Tooltip from "../components/Tooltip";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../store";
 import { getProfiles, saveProfile, deleteProfile } from "../lib/tauri";
+import { delay } from "../lib/motion";
 import type { Profile } from "../types";
 
 const DEFAULT_PROFILE: Omit<Profile, "id" | "created_at"> = {
@@ -74,34 +75,20 @@ export default function Profiles() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 dark:border-slate-800 light:border-slate-200">
+    <div className="pm-page">
+      <div className="pm-page-h">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100 dark:text-slate-100 light:text-slate-900">
-            Profils
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configurations sauvegardées pour le mirroring
-          </p>
+          <h1 className="og-rise">Profils</h1>
+          <p className="og-rise" style={delay(40)}>Configurations sauvegardées pour le mirroring</p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="
-            flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-            bg-brand-600 hover:bg-brand-500 text-white transition-colors
-          "
-        >
-          <Plus size={15} />
+        <button onClick={handleCreate} className="og-btn og-btn-ink og-rise" style={delay(80)}>
+          <Plus size={15} aria-hidden="true" />
           Nouveau profil
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-5">
-        {error && (
-          <p className="text-xs text-red-400 mb-4 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
-            {error}
-          </p>
-        )}
+      <div className="pm-scroll">
+        {error && <p className="pm-note pm-err break-all mb-4">{error}</p>}
 
         {/* Formulaire d'édition */}
         {editing && (
@@ -119,15 +106,26 @@ export default function Profiles() {
         {profiles.length === 0 && !editing ? (
           <EmptyProfiles onCreate={handleCreate} />
         ) : (
-          <div className="space-y-3 mt-4">
-            {profiles.map((profile) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                onEdit={() => setEditing(profile)}
-                onDelete={() => handleDelete(profile.id)}
-              />
-            ))}
+          <div className="og-glass og-card og-rise mt-4" style={delay(150)}>
+            <div className="og-card-h">
+              <div>
+                <h2>Mes profils</h2>
+                <p className="og-num">
+                  {profiles.length} profil{profiles.length > 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+            <ul className="og-list">
+              {profiles.map((profile, i) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  index={i}
+                  onEdit={() => setEditing(profile)}
+                  onDelete={() => handleDelete(profile.id)}
+                />
+              ))}
+            </ul>
           </div>
         )}
       </div>
@@ -139,49 +137,38 @@ export default function Profiles() {
 
 function ProfileCard({
   profile,
+  index,
   onEdit,
   onDelete,
 }: {
   profile: Profile;
+  index: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div
-      className="
-        flex items-center justify-between p-4 rounded-xl border
-        bg-slate-900 dark:bg-slate-900 light:bg-white
-        border-slate-800 dark:border-slate-800 light:border-slate-200
-        hover:border-brand-600/30 transition-all group animate-fade-in
-      "
+    <li
+      className="og-row og-fadein group"
+      style={index < 12 ? delay(160 + index * 20) : undefined}
     >
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-brand-600/10 flex items-center justify-center">
-          <Bookmark size={18} className="text-brand-400" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-sm text-slate-200 dark:text-slate-200 light:text-slate-900">
-            {profile.name}
-          </h3>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <Chip label={`${profile.max_fps} fps`} />
-            <Chip label={`${profile.max_size}p`} />
-            <Chip label={`${profile.bitrate} Mb/s`} />
-            {profile.enable_audio && <Chip label="Audio" color="green" />}
-          </div>
+      <div className="og-ic" style={{ width: 36, height: 36 }}>
+        <Bookmark size={16} aria-hidden="true" />
+      </div>
+      <div className="og-t">
+        <b>{profile.name}</b>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Chip label={`${profile.max_fps} fps`} />
+          <Chip label={`${profile.max_size}p`} />
+          <Chip label={`${profile.bitrate} Mb/s`} />
+          {profile.enable_audio && <Chip label="Audio" />}
         </div>
       </div>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <IconButton onClick={onEdit} icon={<Edit2 size={14} />} label="Modifier" />
-        <IconButton
-          onClick={onDelete}
-          icon={<Trash2 size={14} />}
-          label="Supprimer"
-          danger
-        />
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+        <IconButton onClick={onEdit} icon={<Edit2 size={15} aria-hidden="true" />} label="Modifier" />
+        <IconButton onClick={onDelete} icon={<Trash2 size={15} aria-hidden="true" />} label="Supprimer" danger />
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -204,16 +191,13 @@ function ProfileForm({
     onChange({ ...profile, [key]: value });
 
   return (
-    <div className="rounded-xl border border-brand-600/30 bg-slate-900 dark:bg-slate-900 light:bg-white p-5 space-y-5 animate-slide-up">
+    <div className="og-glass og-card space-y-5" style={{ animation: "og-rise 260ms var(--og-ease-out) both" }}>
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-200 dark:text-slate-200 light:text-slate-900">
+        <h3 className="text-xl font-bold text-fg">
           {profile.id ? "Modifier le profil" : "Nouveau profil"}
         </h3>
-        <button
-          onClick={onCancel}
-          className="text-slate-500 hover:text-slate-300 p-1 rounded-md hover:bg-slate-800 transition-colors"
-        >
-          <X size={16} />
+        <button onClick={onCancel} className="pm-iconbtn" aria-label="Fermer">
+          <X size={17} aria-hidden="true" />
         </button>
       </div>
 
@@ -279,7 +263,7 @@ function ProfileForm({
         />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         <Toggle
           label="Audio activé"
           value={profile.enable_audio}
@@ -301,27 +285,15 @@ function ProfileForm({
       </div>
 
       <div className="flex gap-3 pt-1">
-        <button
-          onClick={onCancel}
-          className="flex-1 py-2 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-        >
+        <button onClick={onCancel} className="og-btn flex-1">
           Annuler
         </button>
         <button
           onClick={() => onSave(profile)}
           disabled={loading || !profile.name.trim()}
-          className="
-            flex-1 py-2 rounded-lg text-sm font-medium
-            bg-brand-600 hover:bg-brand-500 text-white
-            disabled:opacity-50 transition-colors
-            flex items-center justify-center gap-2
-          "
+          className="og-btn og-btn-ink flex-1"
         >
-          {loading ? (
-            <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Save size={14} />
-          )}
+          {loading ? <span className="pm-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
           Sauvegarder
         </button>
       </div>
@@ -347,7 +319,7 @@ function NumField({
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
-        <label className="text-xs font-medium text-slate-400">{label}</label>
+        <label className={labelCls.replace(" mb-1.5", "")}>{label}</label>
         {tooltip && <Tooltip content={tooltip} />}
       </div>
       <input
@@ -356,7 +328,8 @@ function NumField({
         min={min}
         max={max}
         onChange={(e) => onChange(Number(e.target.value))}
-        className={inputCls}
+        className={inputCls + " og-num"}
+        aria-label={label}
       />
     </div>
   );
@@ -376,43 +349,24 @@ function Toggle({
   return (
     <div className="flex items-center justify-between py-1">
       <div className="flex items-center gap-1.5">
-        <span className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700">
+        <span className="text-sm text-fg font-medium">
           {label}
         </span>
         {tooltip && <Tooltip content={tooltip} />}
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`relative w-10 h-5 rounded-full transition-colors ${value ? "bg-brand-600" : "bg-slate-700"}`}
+        className="pm-switch"
         role="switch"
         aria-checked={value}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${value ? "translate-x-5" : "translate-x-0"}`}
-        />
-      </button>
+        aria-label={label}
+      />
     </div>
   );
 }
 
-function Chip({
-  label,
-  color = "slate",
-}: {
-  label: string;
-  color?: "slate" | "green";
-}) {
-  return (
-    <span
-      className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-        color === "green"
-          ? "bg-emerald-500/10 text-emerald-400"
-          : "bg-slate-800 text-slate-500 dark:bg-slate-800 light:bg-slate-100 light:text-slate-500"
-      }`}
-    >
-      {label}
-    </span>
-  );
+function Chip({ label }: { label: string }) {
+  return <span className="og-pill og-num" style={{ padding: "1px 7px", fontSize: 11 }}>{label}</span>;
 }
 
 function IconButton({
@@ -427,17 +381,7 @@ function IconButton({
   danger?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={`
-        w-8 h-8 flex items-center justify-center rounded-lg transition-colors
-        ${danger
-          ? "text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-          : "text-slate-500 hover:text-slate-200 hover:bg-slate-800 dark:hover:bg-slate-800 light:hover:bg-slate-100"
-        }
-      `}
-    >
+    <button onClick={onClick} title={label} aria-label={label} className={danger ? "pm-iconbtn pm-danger" : "pm-iconbtn"}>
       {icon}
     </button>
   );
@@ -445,35 +389,23 @@ function IconButton({
 
 function EmptyProfiles({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4 animate-fade-in">
-      <div className="w-20 h-20 rounded-2xl bg-slate-800 dark:bg-slate-800 light:bg-slate-100 flex items-center justify-center">
-        <Bookmark size={36} className="text-slate-600" />
+    <div className="og-glass og-card og-rise flex flex-col items-center text-center gap-4 py-10" style={delay(150)}>
+      <div className="og-ic" style={{ width: 56, height: 56 }}>
+        <Bookmark size={26} aria-hidden="true" className="text-fg-2" />
       </div>
-      <div className="text-center">
-        <h3 className="text-base font-semibold text-slate-300 dark:text-slate-300 light:text-slate-700">
-          Aucun profil
-        </h3>
-        <p className="text-sm text-slate-500 mt-1">
+      <div>
+        <h3 className="text-xl font-bold text-fg">Aucun profil</h3>
+        <p className="text-sm text-fg-2 mt-1">
           Créez des profils pour réutiliser vos configurations préférées
         </p>
       </div>
-      <button
-        onClick={onCreate}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
-      >
-        <Plus size={15} />
+      <button onClick={onCreate} className="og-btn">
+        <Plus size={15} aria-hidden="true" />
         Créer mon premier profil
       </button>
     </div>
   );
 }
 
-const labelCls = "block text-xs font-medium text-slate-400 mb-1.5";
-const inputCls = `
-  w-full px-3 py-2 rounded-lg text-sm
-  bg-slate-800 dark:bg-slate-800 light:bg-slate-100
-  border border-slate-700 dark:border-slate-700 light:border-slate-300
-  text-slate-200 dark:text-slate-200 light:text-slate-900
-  focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30
-  transition-colors
-`;
+const labelCls = "block text-xs font-semibold text-fg-2 mb-1.5";
+const inputCls = "og-input";

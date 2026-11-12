@@ -1,12 +1,11 @@
+/* Chargé après src/styles/tokens.css et src/styles/bundle.css (copies du
+   design system Orga Glass, à ne pas modifier ici). Ce fichier ne contient
+   que la coque de l'app et les contrôles absents du bundle. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
-
   html,
   body,
   #root {
@@ -18,48 +17,429 @@
   }
 
   body {
-    font-family: "Inter", system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    background: var(--scene-wall);
   }
 
-  /* Scrollbar personnalisée */
+  /* Les champs restent sélectionnables malgré user-select: none sur la coque */
+  input,
+  textarea,
+  select {
+    user-select: text;
+  }
+
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
-
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-
-  .dark ::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 3px;
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
   }
-
-  .light ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
-  }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
+    background: var(--fg-3);
   }
 }
 
-@layer utilities {
-  .drag-region {
-    -webkit-app-region: drag;
+@layer components {
+  /* ── Coque ─────────────────────────────────────────────────────────── */
+  /* Fenêtre native de 980 × 640 : marge réduite à 10 px (20 px dans le
+     système), la barre de titre occupe la bande du haut. */
+  .pm-shell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .pm-window {
+    flex: 1;
+    min-height: 0;
+    margin: 0 10px 10px;
+    grid-template-columns: 220px 1fr;
+  }
+  .pm-window > main {
+    min-width: 0;
+    min-height: 0;
+    view-transition-name: og-page;
   }
 
-  .no-drag {
-    -webkit-app-region: no-drag;
+  /* Barre de titre : posée sur le décor, sans surface propre */
+  .pm-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 34px;
+    padding: 0 14px;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .pm-winbtn {
+    width: 28px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+  .pm-winbtn.pm-close:hover {
+    background: var(--hot);
+    color: var(--on-hot);
   }
 
-  /* Transition fluide pour le thème */
-  .theme-transition {
-    transition: background-color 0.2s ease, color 0.2s ease,
-      border-color 0.2s ease;
+  /* Barre latérale : le bas porte des actions blanches sur le cuivre */
+  .pm-side-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: #fff;
+    font: 500 14px/1 var(--font-sans);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+  .og-nav button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: #fff;
+    font: 500 14px/1 var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+  .og-nav button > * {
+    position: relative;
+    z-index: 1;
+  }
+  .og-nav button .og-ind {
+    display: none;
+  }
+  .og-nav button[aria-current="page"] .og-ind {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: #fff;
+    box-shadow: var(--shadow-pill);
+    view-transition-name: og-nav-ind;
+  }
+  .og-nav button[aria-current="page"] {
+    color: #2a1812;
+  }
+
+  /* ── Page ──────────────────────────────────────────────────────────── */
+  .pm-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .pm-page-h {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 6px 16px;
+    flex-shrink: 0;
+  }
+  .pm-page-h h1 {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+  }
+  .pm-page-h p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--fg-2);
+  }
+  .pm-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 2px 6px 16px;
+  }
+  .og-label {
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+  }
+
+  /* Bouton désactivé : opacité seule, sans survol */
+  .og-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+  }
+  .og-btn-danger {
+    background: var(--danger-soft);
+    border-color: transparent;
+    color: var(--danger);
+    font-weight: 600;
+  }
+  .pm-iconbtn {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--fg-2);
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  /* Pastille « connecté » : point d'état olive, sans clignotement */
+  .og-pill .pm-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .og-pill.pm-ok {
+    color: var(--fg);
+  }
+  .og-pill.pm-ok .pm-dot {
+    background: var(--data-7);
+  }
+  .og-pill.pm-err {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  /* Encadré d'information ou d'erreur posé sur une carte */
+  .pm-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-control);
+    background: var(--card);
+    color: var(--fg-2);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .pm-note.pm-err {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .pm-note.pm-warn {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .pm-note.pm-ok {
+    background: var(--card);
+    color: var(--fg);
+  }
+
+  /* Interrupteur : rail `muted`, actif en `ink` (action), pas en `hot` */
+  .pm-switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+  .pm-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--fg-3);
+    transition: transform 200ms var(--og-ease-out), background-color 150ms ease;
+  }
+  .pm-switch[aria-checked="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  .pm-switch[aria-checked="true"]::after {
+    background: var(--on-ink);
+    transform: translateX(18px);
+  }
+
+  /* Curseur */
+  .pm-range {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--muted);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    accent-color: var(--hot);
+  }
+  .pm-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--hot);
+    border: 2px solid #fff;
+    box-shadow: var(--shadow-pill);
+  }
+
+  /* Menu déroulant (profils) */
+  .pm-menu {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    min-width: 200px;
+    padding: 6px;
+    animation: og-rise 200ms var(--og-ease-out) both;
+  }
+  .pm-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
+    font: 600 13px/1.3 var(--font-sans);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+  .pm-menu small {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--fg-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Info-bulle */
+  .pm-tip {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    width: 240px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    pointer-events: none;
+    animation: og-fade 150ms var(--og-ease-out) both;
+  }
+
+  /* Dialogue */
+  .pm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 18, 13, 0.32);
+    /* Couleur seule : une opacité animée ici couperait le flou du dialogue */
+    animation: pm-dim 200ms var(--og-ease-out) both;
+  }
+  .pm-backdrop > .og-dialog {
+    animation: og-rise 260ms var(--og-ease-out) both;
+  }
+
+  .pm-spin {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    animation: pm-spin 700ms linear infinite;
+  }
+}
+
+@keyframes pm-dim {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes pm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pm-winbtn:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .pm-side-btn:hover,
+  .og-nav button:not([aria-current="page"]):hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .pm-iconbtn:hover {
+    background: var(--card);
+    color: var(--fg);
+  }
+  .pm-iconbtn.pm-danger:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .pm-menu button:hover {
+    background: var(--card);
+  }
+  .og-btn:disabled:hover {
+    transform: none;
+  }
+  /* Le bundle éclaircit les boutons, onglets et filtres en blanc au survol ;
+     en sombre ce blanc effacerait le texte clair : on garde le ton du verre. */
+  .og-btn.og-btn-danger.og-btn-danger:not(:disabled):hover {
+    background: var(--danger-soft);
+  }
+  [data-theme="dark"] .og-btn:not(.og-btn-ink):not(.og-btn-light):not(.og-btn-outline):not(.og-btn-danger):hover,
+  [data-theme="dark"] .og-seg :is(a, button):not([aria-current="page"]):not([aria-selected="true"]):hover,
+  [data-theme="dark"] .og-chip:not([aria-pressed="true"]):hover {
+    background: var(--hover);
+  }
+  [data-theme="dark"] .og-btn-ink:hover {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-switch::after {
+    transition: background-color 150ms ease;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pm-backdrop {
+    background: rgba(30, 18, 13, 0.55);
   }
 }

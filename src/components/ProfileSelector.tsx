@@ -57,44 +57,26 @@ export default function ProfileSelector({ device }: Props) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="
-          flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-          bg-slate-800 hover:bg-slate-700 text-slate-300
-          dark:bg-slate-800 dark:hover:bg-slate-700
-          light:bg-slate-100 light:hover:bg-slate-200 light:text-slate-700
-          transition-colors
-        "
+        className="og-btn og-s"
+        aria-expanded={open}
       >
-        <Bookmark size={12} />
+        <Bookmark size={12} aria-hidden="true" />
         Profils
-        <ChevronDown size={12} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+        <ChevronDown
+          size={12}
+          aria-hidden="true"
+          className={open ? "rotate-180 transition-transform duration-200 ease-og-out" : "transition-transform duration-200 ease-og-out"}
+        />
       </button>
 
       {open && (
-        <div
-          className="
-            absolute left-0 top-full mt-1 z-20 min-w-44
-            rounded-xl border shadow-xl py-1
-            bg-slate-900 dark:bg-slate-900 light:bg-white
-            border-slate-700 dark:border-slate-700 light:border-slate-200
-            animate-slide-up
-          "
-        >
+        <div className="pm-menu og-dialog">
           {relevantProfiles.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => applyProfile(p.id)}
-              className="
-                w-full text-left px-3 py-2 text-xs font-medium
-                text-slate-300 hover:text-white hover:bg-slate-800
-                dark:hover:bg-slate-800 light:text-slate-700 light:hover:bg-slate-100
-                transition-colors
-              "
-            >
+            <button key={p.id} onClick={() => applyProfile(p.id)}>
               {p.name}
-              <span className="block text-slate-500 font-normal text-[10px]">
-                {p.max_fps}fps · {p.max_size}p · {p.bitrate}Mb/s
-              </span>
+              <small>
+                {p.max_fps} fps · {p.max_size}p · {p.bitrate} Mb/s
+              </small>
             </button>
           ))}
         </div>
