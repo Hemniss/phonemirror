@@ -1,7 +1,7 @@
 import { Bookmark, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "../store";
-import { startMirror } from "../lib/tauri";
+import { startMirror, stopMirror } from "../lib/tauri";
 import type { Device } from "../types";
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function ProfileSelector({ device }: Props) {
-  const { profiles, setMirroring, defaultSettings } = useAppStore();
+  const { profiles, mirroringSerials, setMirroring, defaultSettings } = useAppStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -31,6 +31,13 @@ export default function ProfileSelector({ device }: Props) {
     const profile = profiles.find((p) => p.id === profileId);
     if (!profile) return;
     setOpen(false);
+
+    // Un miroir tourne déjà : l'arrêter d'abord, sinon le premier scrcpy
+    // reste ouvert et n'est plus suivi par l'interface.
+    if (mirroringSerials.includes(device.serial)) {
+      await stopMirror(device.serial);
+      setMirroring(device.serial, false);
+    }
 
     await startMirror({
       serial: device.serial,
