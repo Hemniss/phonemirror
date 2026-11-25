@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Profiles from "./pages/Profiles";
 import { markEntering } from "./lib/motion";
+import { getProfiles } from "./lib/tauri";
 
 function ResizeBorders() {
   const win = getCurrentWindow();
@@ -45,8 +46,17 @@ export default function App() {
     markEntering();
   }, []);
 
-  // Démarre le polling des appareils
+  // Démarre le polling des appareils (seul appel de useDevices)
   useDevices();
+
+  // Charge les profils dès le lancement : sans eux, les cartes n'ont pas de
+  // bouton « Profils » tant que la page Profils n'a pas été ouverte. Un échec
+  // ne bloque pas le tableau de bord ; la page Profils affiche le sien.
+  useEffect(() => {
+    getProfiles()
+      .then((profiles) => useAppStore.getState().setProfiles(profiles))
+      .catch(() => {});
+  }, []);
 
   return (
     <>

@@ -27,3 +27,8 @@ Object.defineProperty(globalThis, "localStorage", {
   value: new MemoryStorage(),
   configurable: true,
 });
+
+// Sans `globals: true`, Testing Library ne démonte pas seul entre deux tests.
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+afterEach(() => cleanup());
