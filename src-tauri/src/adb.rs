@@ -388,4 +388,69 @@ esac"#,
         assert_eq!(devices[1].model, "Pixel 7");
         assert_eq!(devices[1].android_version, "14");
     }
+
+    fn pairs(v: &[(&str, &str)]) -> Vec<(String, String)> {
+        v.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+    }
+
+    #[test]
+    fn parse_devices_skips_header_daemon_and_blank_lines() {
+        let out = "* daemon not running; starting now at tcp:5037\n\
+                   * daemon started successfully\n\
+                   List of devices attached\n\
+                   R58M12345              device usb:1-1 product:a model:SM_G model:x transport_id:1\n\
+                   \n\
+                   0123ABC                unauthorized usb:1-2 transport_id:2\n\
+                   192.168.1.20:5555      offline transport_id:3\n\
+                   adb-R58M12345-AbCdEf._adb-tls-connect._tcp device product:a model:b transport_id:4\n\
+                   [fe80::1]:5555         device product:a transport_id:5\n\
+                   \n";
+        assert_eq!(
+            parse_devices(out),
+            pairs(&[
+                ("R58M12345", "device"),
+                ("0123ABC", "unauthorized"),
+                ("192.168.1.20:5555", "offline"),
+                ("adb-R58M12345-AbCdEf._adb-tls-connect._tcp", "device"),
+                ("[fe80::1]:5555", "device"),
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_devices_empty_list() {
+        assert!(parse_devices("List of devices attached\n\n").is_empty());
+        assert!(parse_devices("").is_empty());
+    }
+
+    #[test]
+    fn parse_device_info_normal_output_with_ip() {
+        let text = "Pixel 7\npanther\n14\n\
+                    3: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 3000\n    \
+                    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n       \
+                    valid_lft forever preferred_lft forever\n";
+        assert_eq!(
+            parse_device_info(text, true),
+            DeviceInfo {
+                model: "Pixel 7".into(),
+                product: "panther".into(),
+                android_version: "14".into(),
+                ip: Some("192.168.1.20".into()),
+            }
+        );
+        assert_eq!(parse_device_info(text, false).ip, None);
+    }
+
+    #[test]
+    fn parse_device_info_empty_fields_give_unknown_model() {
+        assert_eq!(parse_device_info("\n\n\n", true), DeviceInfo::unknown());
+        assert_eq!(parse_device_info("", false), DeviceInfo::unknown());
+    }
+
+    #[test]
+    fn parse_device_info_without_wlan0() {
+        let info = parse_device_info("Pixel 7\npanther\n14\n", true);
+        assert_eq!(info.model, "Pixel 7");
+        assert_eq!(info.ip, None);
+    }
 }
