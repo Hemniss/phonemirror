@@ -13,18 +13,26 @@ export async function refreshDevices(): Promise<void> {
     const devices = await listDevices();
     setDevices(devices);
     setGlobalError(null);
-
-    // Vérifier en parallèle si les processus scrcpy sont toujours actifs
-    const mirroringSerials = useAppStore.getState().mirroringSerials;
-    await Promise.all(
-      mirroringSerials.map(async (serial) => {
-        const still = await isMirroring(serial);
-        if (!still) setMirroring(serial, false);
-      })
-    );
   } catch (err) {
+    // adb ne répond pas : la liste précédente n'est plus fiable, on la vide
+    // pour ne pas laisser des cartes aux boutons actifs.
+    setDevices([]);
     setGlobalError(String(err));
   }
+
+  // Vérifier en parallèle si les processus scrcpy sont toujours actifs,
+  // même quand adb a échoué (scrcpy est suivi par le backend, pas par adb).
+  const mirroringSerials = useAppStore.getState().mirroringSerials;
+  await Promise.all(
+    mirroringSerials.map(async (serial) => {
+      try {
+        const still = await isMirroring(serial);
+        if (!still) setMirroring(serial, false);
+      } catch {
+        // État inconnu : on garde le miroir, le poll suivant réessaiera.
+      }
+    })
+  );
 }
 
 /** Démarre la boucle de polling des appareils. À appeler une seule fois,

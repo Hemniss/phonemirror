@@ -14,6 +14,16 @@ vi.mock("../lib/tauri", () => ({
 const mockList = vi.mocked(listDevices);
 const mockIsMirroring = vi.mocked(isMirroring);
 
+const PHONE: Device = {
+  serial: "abc",
+  model: "Pixel",
+  product: "pixel",
+  state: "device",
+  connection_type: "usb",
+  android_version: "14",
+  ip_address: null,
+};
+
 beforeEach(() => {
   vi.useFakeTimers();
   useAppStore.setState({ devices: [], mirroringSerials: [], globalError: null });
@@ -49,5 +59,34 @@ describe("useDevices — boucle de polling (B1)", () => {
     await act(() => vi.advanceTimersByTimeAsync(10_000));
 
     expect(mockList.mock.calls.length - atMount).toBe(4);
+  });
+});
+
+describe("useDevices — erreur adb (B3)", () => {
+  it("listDevices rejeté : liste vidée, erreur affichée, puis rétablie au poll suivant", async () => {
+    useAppStore.setState({ devices: [PHONE] });
+    mockList.mockRejectedValueOnce("adb introuvable");
+    renderHook(() => useDevices());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(useAppStore.getState().devices).toEqual([]);
+    expect(useAppStore.getState().globalError).toBe("adb introuvable");
+
+    mockList.mockResolvedValue([PHONE]);
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+
+    expect(useAppStore.getState().devices).toEqual([PHONE]);
+    expect(useAppStore.getState().globalError).toBeNull();
+  });
+
+  it("listDevices rejeté : les miroirs en cours sont quand même vérifiés", async () => {
+    useAppStore.setState({ mirroringSerials: ["abc"] });
+    mockList.mockRejectedValue("adb introuvable");
+    mockIsMirroring.mockResolvedValue(false);
+    renderHook(() => useDevices());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(mockIsMirroring).toHaveBeenCalledWith("abc");
+    expect(useAppStore.getState().mirroringSerials).toEqual([]);
   });
 });
