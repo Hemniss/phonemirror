@@ -192,19 +192,39 @@ fi
 if [ "$SCRCPY_INSTALLED_VERSION" -ge "$SCRCPY_MIN_VERSION" ] 2>/dev/null; then
     skip "scrcpy >= 2.0 déjà installé ($(scrcpy --version 2>&1 | head -1))"
 else
+    # Version fixée : c'est celle que l'app embarque et avec laquelle elle est
+    # testée. À garder alignée avec scripts/download-scrcpy.sh (version par
+    # défaut et empreintes épinglées).
+    SCRCPY_VERSION="4.1"
+    SCRCPY_SHA256="ad56ae8bfeedf41e824945c11dbf55fcb092b3e615b9b486f48a50e30d389635"
+    SCRCPY_URL="https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VERSION}/scrcpy-linux-x86_64-v${SCRCPY_VERSION}.tar.gz"
+    SCRCPY_DIR="/opt/scrcpy"
+
+    echo "   Téléchargement de scrcpy v${SCRCPY_VERSION} depuis GitHub..."
+    TMP_DIR=$(mktemp -d)
+    curl -fSL "$SCRCPY_URL" -o "$TMP_DIR/scrcpy.tar.gz" || fail "Impossible de télécharger scrcpy v${SCRCPY_VERSION}"
+
+    # Vérification de l'empreinte avant toute commande sudo.
+    if command -v sha256sum &>/dev/null; then
+        SCRCPY_ACTUAL=$(sha256sum "$TMP_DIR/scrcpy.tar.gz" | awk '{print $1}')
+    elif command -v shasum &>/dev/null; then
+        SCRCPY_ACTUAL=$(shasum -a 256 "$TMP_DIR/scrcpy.tar.gz" | awk '{print $1}')
+    else
+        rm -rf "$TMP_DIR"
+        fail "Aucun outil SHA256 (sha256sum ou shasum) : impossible de vérifier scrcpy"
+    fi
+    if [ "$SCRCPY_ACTUAL" != "$SCRCPY_SHA256" ]; then
+        rm -rf "$TMP_DIR"
+        fail "Empreinte SHA256 invalide pour scrcpy v${SCRCPY_VERSION} (attendu $SCRCPY_SHA256, obtenu $SCRCPY_ACTUAL)"
+    fi
+    ok "Empreinte SHA256 de scrcpy v${SCRCPY_VERSION} vérifiée"
+
     # Supprimer l'ancienne version apt si présente
     if dpkg -l scrcpy &>/dev/null 2>&1; then
         echo "   Suppression de l'ancienne version apt..."
         sudo apt-get remove -y scrcpy 2>/dev/null || true
     fi
 
-    echo "   Téléchargement de scrcpy depuis GitHub..."
-    SCRCPY_VERSION=$(curl -sI https://github.com/Genymobile/scrcpy/releases/latest | grep -i '^location:' | sed 's/.*\/v//' | tr -d '\r\n')
-    SCRCPY_URL="https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VERSION}/scrcpy-linux-x86_64-v${SCRCPY_VERSION}.tar.gz"
-    SCRCPY_DIR="/opt/scrcpy"
-
-    TMP_DIR=$(mktemp -d)
-    curl -fSL "$SCRCPY_URL" -o "$TMP_DIR/scrcpy.tar.gz" || fail "Impossible de télécharger scrcpy v${SCRCPY_VERSION}"
     sudo rm -rf "$SCRCPY_DIR"
     sudo mkdir -p "$SCRCPY_DIR"
     sudo tar xzf "$TMP_DIR/scrcpy.tar.gz" -C "$SCRCPY_DIR" --strip-components=1
@@ -230,14 +250,28 @@ fi
 
 # ─── Règle udev pour les appareils Android ────────────────────────────────
 step "Configuration des règles udev (accès USB Android)..."
-UDEV_RULE='SUBSYSTEM=="usb", ATTR{idVendor}=="*", MODE="0664", GROUP="plugdev"'
+# Accès limité à l'interface adb (classe ff, sous-classe 42, protocole 01,
+# constantes ADB_CLASS/ADB_SUBCLASS/ADB_PROTOCOL d'AOSP), et non à tout
+# périphérique USB. Syntaxe ENV{ID_USB_INTERFACES}=="*:xxxxxx:*" reprise de
+# android-udev-rules (https://github.com/M0Rf30/android-udev-rules,
+# 51-android.rules, qui l'emploie pour écarter les imprimantes 0701??).
+UDEV_RULE='SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{ID_USB_INTERFACES}=="*:ff4201:*", MODE="0660", GROUP="plugdev", TAG+="uaccess"'
 UDEV_FILE="/etc/udev/rules.d/51-android.rules"
-if [ -f "$UDEV_FILE" ]; then
+# Ancienne règle posée par les versions précédentes de ce script : elle
+# ouvrait tout périphérique USB (claviers, clés de sécurité) au groupe plugdev.
+UDEV_OLD_PATTERN='ATTR{idVendor}=="\*"'
+if [ -f "$UDEV_FILE" ] && grep -qF "$UDEV_RULE" "$UDEV_FILE"; then
     skip "Règles udev déjà configurées"
+elif [ -f "$UDEV_FILE" ] && ! grep -q "$UDEV_OLD_PATTERN" "$UDEV_FILE"; then
+    skip "$UDEV_FILE existe déjà (autre origine) : laissé tel quel"
 else
+    if [ -f "$UDEV_FILE" ]; then
+        echo "   Remplacement de l'ancienne règle udev ouverte à tout périphérique USB..."
+    fi
     echo "$UDEV_RULE" | sudo tee "$UDEV_FILE" > /dev/null
     sudo chmod a+r "$UDEV_FILE"
     sudo udevadm control --reload-rules 2>/dev/null || true
+    sudo udevadm trigger --subsystem-match=usb 2>/dev/null || true
     sudo usermod -aG plugdev "$USER" 2>/dev/null || true
     ok "Règles udev configurées (reconnectez-vous pour que le groupe plugdev soit actif)"
 fi
