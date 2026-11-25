@@ -1,6 +1,6 @@
 import { RefreshCw, Smartphone, Wifi, AlertCircle, Cable } from "lucide-react";
 import { useAppStore } from "../store";
-import { useDevices } from "../hooks/useDevices";
+import { refreshDevices } from "../hooks/useDevices";
 import DeviceCard from "../components/DeviceCard";
 import { useState } from "react";
 import ConnectionModal from "../components/ConnectionModal";
@@ -8,13 +8,12 @@ import { delay } from "../lib/motion";
 
 export default function Dashboard() {
   const { devices, devicesLoading, globalError } = useAppStore();
-  const { refresh } = useDevices();
   const [showConnect, setShowConnect] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refresh();
+    await refreshDevices();
     setTimeout(() => setRefreshing(false), 600);
   };
 
@@ -82,7 +81,7 @@ export default function Dashboard() {
             />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
               {usbDevices.map((device, i) => (
-                <DeviceCard key={device.serial} device={device} onRefresh={refresh} index={i} />
+                <DeviceCard key={device.serial} device={device} onRefresh={refreshDevices} index={i} />
               ))}
             </div>
           </section>
@@ -101,7 +100,7 @@ export default function Dashboard() {
                 <DeviceCard
                   key={device.serial}
                   device={device}
-                  onRefresh={refresh}
+                  onRefresh={refreshDevices}
                   index={usbDevices.length + i}
                 />
               ))}
