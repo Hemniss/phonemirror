@@ -12,6 +12,7 @@ import { useAppStore } from "../store";
 import { getProfiles, saveProfile, deleteProfile } from "../lib/tauri";
 import { delay } from "../lib/motion";
 import type { Profile } from "../types";
+import { PROFILE_BOUNDS, profileIsValid, rangeError, type Bounds } from "../lib/validation";
 
 const DEFAULT_PROFILE: Omit<Profile, "id" | "created_at"> = {
   name: "Nouveau profil",
@@ -232,32 +233,28 @@ function ProfileForm({
         <NumField
           label="FPS maximum"
           value={profile.max_fps}
-          min={15}
-          max={120}
+          bounds={PROFILE_BOUNDS.max_fps}
           onChange={(v) => set("max_fps", v)}
           tooltip="Images par seconde. 30 fps consomme moins de ressources. 60 fps est fluide pour la navigation et les jeux. Au-delà de 60, l'amélioration est subtile."
         />
         <NumField
           label="Résolution (px)"
           value={profile.max_size}
-          min={480}
-          max={2160}
+          bounds={PROFILE_BOUNDS.max_size}
           onChange={(v) => set("max_size", v)}
           tooltip="Résolution maximale en pixels (côté le plus long). 720 = rapide et léger. 1080 = qualité standard. 1440+ = très net mais plus gourmand."
         />
         <NumField
           label="Débit (Mb/s)"
           value={profile.bitrate}
-          min={1}
-          max={64}
+          bounds={PROFILE_BOUNDS.bitrate}
           onChange={(v) => set("bitrate", v)}
           tooltip="Quantité de données vidéo par seconde. Sur USB : 8-16 Mb/s. Sur WiFi : 4-8 Mb/s. Plus élevé = meilleure qualité mais plus de bande passante."
         />
         <NumField
           label="Tampon d'affichage (ms)"
           value={profile.video_buffer}
-          min={0}
-          max={200}
+          bounds={PROFILE_BOUNDS.video_buffer}
           onChange={(v) => set("video_buffer", v)}
           tooltip="Délai avant d'afficher chaque image. 0 ms = latence minimale, idéal pour les jeux. 50-100 ms lisse les saccades sur WiFi instable. Sur USB, gardez 0."
         />
@@ -290,7 +287,7 @@ function ProfileForm({
         </button>
         <button
           onClick={() => onSave(profile)}
-          disabled={loading || !profile.name.trim()}
+          disabled={loading || !profile.name.trim() || !profileIsValid(profile)}
           className="og-btn og-btn-ink flex-1"
         >
           {loading ? <span className="pm-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
@@ -304,18 +301,17 @@ function ProfileForm({
 function NumField({
   label,
   value,
-  min,
-  max,
+  bounds,
   onChange,
   tooltip,
 }: {
   label: string;
   value: number;
-  min: number;
-  max: number;
+  bounds: Bounds;
   onChange: (v: number) => void;
   tooltip?: string;
 }) {
+  const error = rangeError(value, bounds);
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
@@ -324,13 +320,17 @@ function NumField({
       </div>
       <input
         type="number"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(e) => onChange(Number(e.target.value))}
+        // Champ vidé : NaN plutôt que 0, pour signaler l'erreur au lieu d'inventer une valeur.
+        value={Number.isNaN(value) ? "" : value}
+        min={bounds.min}
+        max={bounds.max}
+        step={1}
+        onChange={(e) => onChange(e.target.value === "" ? NaN : Number(e.target.value))}
         className={inputCls + " og-num"}
         aria-label={label}
+        aria-invalid={error !== null}
       />
+      {error && <p className="pm-note pm-err mt-1.5">{error}</p>}
     </div>
   );
 }

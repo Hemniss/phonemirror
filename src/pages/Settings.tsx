@@ -2,6 +2,7 @@ import { Monitor, Zap, Volume2, Layers, Hand, Sun, Moon, Gauge } from "lucide-re
 import { useAppStore } from "../store";
 import Tooltip from "../components/Tooltip";
 import { delay } from "../lib/motion";
+import { BITRATE_MBPS, MAX_FPS, MAX_SIZE, VIDEO_BUFFER_MS } from "../lib/validation";
 // Version lue dans package.json à la compilation (import nommé : Vite
 // n'embarque que ce champ, pas le reste du fichier).
 import { version as appVersion } from "../../package.json";
@@ -30,8 +31,8 @@ export default function Settings() {
           <SliderField
             label="Résolution maximale"
             value={defaultSettings.max_size}
-            min={480}
-            max={2160}
+            min={MAX_SIZE.min}
+            max={MAX_SIZE.max}
             step={120}
             unit="p"
             presets={[720, 1080, 1440, 2160]}
@@ -41,8 +42,8 @@ export default function Settings() {
           <SliderField
             label="FPS maximum"
             value={defaultSettings.max_fps}
-            min={15}
-            max={120}
+            min={MAX_FPS.min}
+            max={MAX_FPS.max}
             step={15}
             unit=" fps"
             presets={[30, 60, 90, 120]}
@@ -61,8 +62,8 @@ export default function Settings() {
           <SliderField
             label="Tampon d'affichage"
             value={defaultSettings.video_buffer}
-            min={0}
-            max={200}
+            min={VIDEO_BUFFER_MS.min}
+            max={VIDEO_BUFFER_MS.max}
             step={10}
             unit=" ms"
             presets={[0, 50, 100, 200]}
@@ -81,8 +82,8 @@ export default function Settings() {
           <SliderField
             label="Débit vidéo"
             value={defaultSettings.bitrate}
-            min={2}
-            max={32}
+            min={BITRATE_MBPS.min}
+            max={BITRATE_MBPS.max}
             step={2}
             unit=" Mb/s"
             presets={[4, 8, 16, 32]}

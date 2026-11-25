@@ -20,9 +20,6 @@ export const pairDevice = (
   code: string
 ): Promise<void> => invoke("pair_device", { ip, port, code });
 
-export const getDeviceIpAddress = (serial: string): Promise<string> =>
-  invoke("get_device_ip_address", { serial });
-
 // ─── scrcpy / Mirror ───────────────────────────────────────────────────────
 
 export const startMirror = (config: MirrorConfig): Promise<void> =>

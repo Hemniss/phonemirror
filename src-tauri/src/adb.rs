@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::bounds::{check_pair_code, check_port};
 use crate::process;
 use std::path::Path;
 use std::process::Output;
@@ -257,6 +258,7 @@ pub async fn connect_wireless(app: AppHandle, ip: String, port: u16) -> Result<S
 }
 
 fn connect_with(adb: &Path, ip: &str, port: u16) -> Result<String, String> {
+    check_port(port)?;
     let addr = format!("{ip}:{port}");
     let output = run_adb(adb, &["connect", &addr], NETWORK_TIMEOUT)?;
 
@@ -303,6 +305,7 @@ pub async fn enable_tcpip(app: AppHandle, serial: String, port: u16) -> Result<(
 }
 
 fn tcpip_with(adb: &Path, serial: &str, port: u16) -> Result<(), String> {
+    check_port(port)?;
     let output = run_adb(adb, &["-s", serial, "tcpip", &port.to_string()], NETWORK_TIMEOUT)?;
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
@@ -323,6 +326,8 @@ pub async fn pair_device(
 }
 
 fn pair_with(adb: &Path, ip: &str, port: u16, code: &str) -> Result<(), String> {
+    check_port(port)?;
+    check_pair_code(code)?;
     let addr = format!("{ip}:{port}");
     let output = run_adb(adb, &["pair", &addr, code], NETWORK_TIMEOUT)?;
 
@@ -335,21 +340,23 @@ fn pair_with(adb: &Path, ip: &str, port: u16, code: &str) -> Result<(), String> 
     }
 }
 
-/// Retourne l'adresse IP WiFi d'un appareil USB.
-#[tauri::command]
-pub async fn get_device_ip_address(app: AppHandle, serial: String) -> Result<String, String> {
-    let adb = get_adb_path(&app)?;
-    blocking(move || {
-        get_device_info(&adb, &serial, true)
-            .ip
-            .ok_or_else(|| "IP introuvable".to_string())
-    })
-    .await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// adb ne doit pas être lancé quand le port ou le code est hors bornes :
+    /// le faux adb échouerait le test s'il était appelé.
+    #[cfg(unix)]
+    #[test]
+    fn port_ou_code_invalide_refuse_sans_lancer_adb() {
+        let fake = FakeAdb::new("echo connected; echo 'Successfully paired'; touch \"$0.called\"");
+        assert!(connect_with(&fake.path, "192.168.1.20", 0).is_err());
+        assert!(tcpip_with(&fake.path, "R58M12345", 0).is_err());
+        assert!(pair_with(&fake.path, "192.168.1.20", 0, "123456").is_err());
+        assert!(pair_with(&fake.path, "192.168.1.20", 37000, "-h").is_err());
+        assert!(!fake.path.with_extension("called").exists(), "adb lancé malgré une valeur invalide");
+        assert!(connect_with(&fake.path, "192.168.1.20", 5555).is_ok());
+    }
 
     /// Faux adb : script shell exécutable dans un dossier temporaire, supprimé au drop.
     #[cfg(unix)]

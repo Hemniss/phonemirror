@@ -1,3 +1,4 @@
+use crate::bounds::{check_range, BITRATE_MBPS, MAX_FPS, MAX_SIZE, VIDEO_BUFFER_MS};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -18,6 +19,16 @@ pub struct Profile {
     pub always_on_top: bool,
     pub show_touches: bool,
     pub created_at: String,
+}
+
+impl Profile {
+    /// Refuse un profil dont un réglage sortirait des bornes acceptées par scrcpy.
+    fn validate(&self) -> Result<(), String> {
+        check_range("FPS maximum", self.max_fps, MAX_FPS)?;
+        check_range("Résolution", self.max_size, MAX_SIZE)?;
+        check_range("Débit (Mb/s)", self.bitrate, BITRATE_MBPS)?;
+        check_range("Tampon d'affichage (ms)", self.video_buffer, VIDEO_BUFFER_MS)
+    }
 }
 
 fn get_profiles_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -112,6 +123,7 @@ fn write_profiles_at(path: &Path, profiles: &[Profile]) -> Result<(), String> {
 }
 
 fn save_profile_at(path: &Path, profile: Profile) -> Result<(), String> {
+    profile.validate()?;
     let mut profiles = load_for_update(path)?;
     if let Some(pos) = profiles.iter().position(|p| p.id == profile.id) {
         profiles[pos] = profile;
@@ -198,6 +210,20 @@ mod tests {
             show_touches: false,
             created_at: "2026-11-25T10:00:00Z".into(),
         }
+    }
+
+    #[test]
+    fn profil_hors_bornes_refuse_et_non_ecrit() {
+        let dir = TestDir::new("bornes");
+        let mut p = profile("a", "Jeu");
+        p.bitrate = 64;
+        assert!(save_profile_at(&dir.file(), p).unwrap_err().contains("Débit"));
+        let mut p = profile("b", "Jeu");
+        p.max_fps = 0;
+        assert!(save_profile_at(&dir.file(), p).is_err());
+        assert!(!dir.file().exists(), "profil invalide écrit sur disque");
+        save_profile_at(&dir.file(), profile("c", "Ok")).unwrap();
+        assert_eq!(names(&dir.file()), ["c:Ok"]);
     }
 
     fn names(path: &Path) -> Vec<String> {
