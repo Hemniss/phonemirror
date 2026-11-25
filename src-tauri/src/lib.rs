@@ -1,4 +1,5 @@
 mod adb;
+mod bounds;
 mod ipc_surface;
 mod mirror_table;
 mod process;

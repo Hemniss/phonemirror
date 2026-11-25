@@ -1,4 +1,5 @@
 use crate::adb::get_adb_path;
+use crate::bounds::{check_opt_range, BITRATE_MBPS, MAX_FPS, MAX_SIZE, VIDEO_BUFFER_MS};
 use serde::{Deserialize, Serialize};
 use crate::mirror_table::MirrorTable;
 use crate::process;
@@ -71,6 +72,14 @@ fn get_scrcpy_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 /// Construit les arguments de scrcpy pour une configuration. Fonction pure.
+/// Refuse une configuration hors bornes avant de lancer scrcpy.
+fn validate_config(config: &MirrorConfig) -> Result<(), String> {
+    check_opt_range("FPS maximum", config.max_fps, MAX_FPS)?;
+    check_opt_range("Résolution", config.max_size, MAX_SIZE)?;
+    check_opt_range("Débit (Mb/s)", config.bitrate, BITRATE_MBPS)?;
+    check_opt_range("Tampon d'affichage (ms)", config.video_buffer, VIDEO_BUFFER_MS)
+}
+
 pub fn build_scrcpy_args(config: &MirrorConfig) -> Vec<String> {
     let mut args: Vec<String> = vec!["-s".to_string(), config.serial.clone()];
 
@@ -141,6 +150,7 @@ pub async fn start_mirror(
     processes: State<'_, ScrcpyProcesses>,
     config: MirrorConfig,
 ) -> Result<(), String> {
+    validate_config(&config)?;
     let scrcpy = get_scrcpy_path(&app)?;
 
     let args = build_scrcpy_args(&config);
@@ -230,6 +240,16 @@ mod tests {
             window_title: Some("Mon téléphone".into()),
             ..base()
         }
+    }
+
+    #[test]
+    fn config_hors_bornes_refusee() {
+        assert!(validate_config(&base()).is_ok());
+        assert!(validate_config(&full()).is_ok());
+        assert!(validate_config(&MirrorConfig { bitrate: Some(64), ..base() }).is_err());
+        assert!(validate_config(&MirrorConfig { max_fps: Some(0), ..base() }).is_err());
+        assert!(validate_config(&MirrorConfig { max_size: Some(10_000), ..base() }).is_err());
+        assert!(validate_config(&MirrorConfig { video_buffer: Some(500), ..base() }).is_err());
     }
 
     fn has(args: &[String], needle: &[&str]) -> bool {

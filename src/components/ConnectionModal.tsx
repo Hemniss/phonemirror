@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Wifi, Link2, QrCode } from "lucide-react";
 import { createPortal } from "react-dom";
 import { connectWireless, pairDevice } from "../lib/tauri";
+import { isValidPairCode, parsePort, PORT_ERROR } from "../lib/validation";
 
 interface Props {
   onClose: () => void;
@@ -25,13 +26,20 @@ export default function ConnectionModal({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Port et code validés ici ; le backend refuse aussi une valeur hors bornes.
+  const portValue = parsePort(port);
+  const pairPortValue = parsePort(pairPort);
+  const pairCodeValid = isValidPairCode(pairCode);
+  const canConnect = ip.trim() !== "" && portValue !== null;
+  const canPair = pairIp.trim() !== "" && pairPortValue !== null && pairCodeValid;
+
   const handleConnect = async () => {
-    if (!ip.trim()) return;
+    if (!canConnect || portValue === null) return;
     setError(null);
     setSuccess(null);
     setLoading(true);
     try {
-      const addr = await connectWireless(ip.trim(), parseInt(port) || 5555);
+      const addr = await connectWireless(ip.trim(), portValue);
       setSuccess(`Connecté à ${addr}`);
       setTimeout(onClose, 1200);
     } catch (err) {
@@ -42,12 +50,12 @@ export default function ConnectionModal({ onClose }: Props) {
   };
 
   const handlePair = async () => {
-    if (!pairIp.trim() || !pairPort.trim() || !pairCode.trim()) return;
+    if (!canPair || pairPortValue === null) return;
     setError(null);
     setSuccess(null);
     setLoading(true);
     try {
-      await pairDevice(pairIp.trim(), parseInt(pairPort), pairCode.trim());
+      await pairDevice(pairIp.trim(), pairPortValue, pairCode.trim());
       setSuccess("Appairage réussi ! Vous pouvez maintenant vous connecter.");
       setMode("connect");
       setIp(pairIp);
@@ -120,7 +128,7 @@ export default function ConnectionModal({ onClose }: Props) {
                     placeholder="192.168.1.100"
                     value={ip}
                     onChange={(e) => setIp(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+                    onKeyDown={(e) => e.key === "Enter" && !loading && handleConnect()}
                     className="og-input og-num"
                   />
                 </div>
@@ -130,12 +138,18 @@ export default function ConnectionModal({ onClose }: Props) {
                     id="wifi-port"
                     type="text"
                     placeholder="5555"
+                    inputMode="numeric"
                     value={port}
                     onChange={(e) => setPort(e.target.value)}
+                    aria-invalid={portValue === null}
+                    aria-describedby={portValue === null ? "wifi-port-err" : undefined}
                     className="og-input og-num"
                   />
                 </div>
               </div>
+              {portValue === null && (
+                <p id="wifi-port-err" className="pm-note pm-err">{PORT_ERROR}</p>
+              )}
             </>
           ) : (
             <>
@@ -167,12 +181,18 @@ export default function ConnectionModal({ onClose }: Props) {
                     id="pair-port"
                     type="text"
                     placeholder="37000"
+                    inputMode="numeric"
                     value={pairPort}
                     onChange={(e) => setPairPort(e.target.value)}
+                    aria-invalid={pairPort !== "" && pairPortValue === null}
+                    aria-describedby={pairPort !== "" && pairPortValue === null ? "pair-port-err" : undefined}
                     className="og-input og-num"
                   />
                 </div>
               </div>
+              {pairPort !== "" && pairPortValue === null && (
+                <p id="pair-port-err" className="pm-note pm-err">{PORT_ERROR}</p>
+              )}
 
               <div>
                 <label htmlFor="pair-code" className={labelCls}>Code de couplage (6 chiffres)</label>
@@ -180,11 +200,16 @@ export default function ConnectionModal({ onClose }: Props) {
                   id="pair-code"
                   type="text"
                   placeholder="123456"
+                  inputMode="numeric"
                   maxLength={6}
                   value={pairCode}
                   onChange={(e) => setPairCode(e.target.value)}
+                  aria-invalid={pairCode !== "" && !pairCodeValid}
                   className="og-input og-num"
                 />
+                {pairCode !== "" && !pairCodeValid && (
+                  <p className="pm-note pm-err mt-2">Le code doit compter 6 chiffres.</p>
+                )}
               </div>
             </>
           )}
@@ -201,7 +226,7 @@ export default function ConnectionModal({ onClose }: Props) {
           </button>
           <button
             onClick={mode === "connect" ? handleConnect : handlePair}
-            disabled={loading}
+            disabled={loading || (mode === "connect" ? !canConnect : !canPair)}
             className="og-btn og-btn-ink flex-1"
           >
             {loading && <span className="pm-spin" aria-hidden="true" />}
