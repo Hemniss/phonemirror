@@ -1,4 +1,5 @@
 mod adb;
+mod ipc_surface;
 mod process;
 mod profiles;
 mod scrcpy;
@@ -24,8 +25,6 @@ pub fn run() {
             scrcpy::start_mirror,
             scrcpy::stop_mirror,
             scrcpy::is_mirroring,
-            scrcpy::push_file,
-            scrcpy::pull_file,
             // Profils
             profiles::get_profiles,
             profiles::save_profile,

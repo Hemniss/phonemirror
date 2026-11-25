@@ -34,20 +34,6 @@ export const stopMirror = (serial: string): Promise<void> =>
 export const isMirroring = (serial: string): Promise<boolean> =>
   invoke("is_mirroring", { serial });
 
-export const pushFile = (
-  serial: string,
-  localPath: string,
-  remotePath: string
-): Promise<void> =>
-  invoke("push_file", { serial, localPath, remotePath });
-
-export const pullFile = (
-  serial: string,
-  remotePath: string,
-  localPath: string
-): Promise<void> =>
-  invoke("pull_file", { serial, remotePath, localPath });
-
 // ─── Profils ───────────────────────────────────────────────────────────────
 
 export const getProfiles = (): Promise<Profile[]> => invoke("get_profiles");

@@ -28,7 +28,6 @@ pub struct MirrorConfig {
     pub borderless: bool,
     pub show_touches: bool,
     pub rotation: Option<u32>,
-    pub record_path: Option<String>,
     pub window_title: Option<String>,
 }
 
@@ -147,11 +146,6 @@ pub async fn start_mirror(
         args.push("PhoneMirror".to_string());
     }
 
-    if let Some(path) = &config.record_path {
-        args.push("-r".to_string());
-        args.push(path.clone());
-    }
-
     let adb = get_adb_path(&app)?;
 
     let mut cmd = process::command(&scrcpy);
@@ -231,44 +225,4 @@ pub async fn is_mirroring(
     } else {
         Ok(false)
     }
-}
-
-/// Envoie un fichier du PC vers l'appareil Android.
-#[tauri::command]
-pub async fn push_file(
-    app: AppHandle,
-    serial: String,
-    local_path: String,
-    remote_path: String,
-) -> Result<(), String> {
-    let adb = get_adb_path(&app)?;
-    let output = process::command(&adb)
-        .args(["-s", &serial, "push", &local_path, &remote_path])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-    Ok(())
-}
-
-/// Récupère un fichier de l'appareil Android vers le PC.
-#[tauri::command]
-pub async fn pull_file(
-    app: AppHandle,
-    serial: String,
-    remote_path: String,
-    local_path: String,
-) -> Result<(), String> {
-    let adb = get_adb_path(&app)?;
-    let output = process::command(&adb)
-        .args(["-s", &serial, "pull", &remote_path, &local_path])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-    Ok(())
 }
