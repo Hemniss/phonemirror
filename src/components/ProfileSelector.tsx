@@ -55,8 +55,6 @@ export default function ProfileSelector({ device, onError }: Props) {
         // Les profils ne couvrent pas ce réglage : on suit la préférence globale.
         borderless: defaultSettings.borderless,
         show_touches: profile.show_touches,
-        rotation: null,
-        record_path: null,
         window_title: `${device.model} — ${profile.name}`,
       });
       setMirroring(device.serial, true);

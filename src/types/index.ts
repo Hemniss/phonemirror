@@ -21,8 +21,10 @@ export interface MirrorConfig {
   fullscreen: boolean;
   borderless: boolean;
   show_touches: boolean;
-  rotation: number | null;
-  record_path: string | null;
+  /** @deprecated Ignoré par le backend. Transitoire : à retirer dès que DeviceCard ne l'envoie plus. */
+  rotation?: null;
+  /** @deprecated Ignoré par le backend. Transitoire : à retirer dès que DeviceCard ne l'envoie plus. */
+  record_path?: null;
   window_title: string | null;
 }
 
