@@ -8,7 +8,7 @@
 - **Audio** du téléphone sur le PC (Android 11+)
 - **Profils** — sauvegardez vos configurations préférées et appliquez-les en un clic
 - **Tampon d'affichage** configurable pour réduire la latence
-- **Rendu optimisé** — Direct3D sur Windows, OpenGL sur Linux (activé automatiquement)
+- **Rendu optimisé** — Direct3D sur Windows, Metal sur macOS, OpenGL sur Linux (activé automatiquement)
 - **Thème sombre / clair**
 - **Connexion WiFi** directe ou par appairage (Android 11+)
 
@@ -57,7 +57,9 @@ l'application, servez-vous de l'installeur ci-dessus.
 
 1. Clic droit sur `install.ps1` → **Exécuter avec PowerShell** (en tant qu'administrateur)
 2. Le script installe automatiquement : Node.js, Rust, Visual Studio Build Tools C++, scrcpy, ADB
-3. Ensuite, utilisez le script `run.ps1` :
+3. Récupérez le scrcpy embarqué depuis Git Bash : `bash scripts/download-scrcpy.sh`
+   (étape obligatoire, voir la note Linux ci-dessous)
+4. Ensuite, utilisez le script `run.ps1` :
 
 ```powershell
 .\run.ps1          # Compile et lance l'application (défaut)
@@ -70,12 +72,35 @@ l'application, servez-vous de l'installeur ci-dessus.
 > (Sécurité Windows → Contrôle des applications → Paramètres de contrôle intelligent → Désactivé).
 > Ce paramètre bloque les exécutables générés par Cargo pendant la compilation.
 
+### macOS
+
+```bash
+bash install.sh
+source "$HOME/.cargo/env"           # Si Rust vient d'être installé
+bash scripts/download-scrcpy.sh     # scrcpy embarqué (obligatoire)
+```
+
+Sur macOS, `install.sh` passe par Homebrew (installé s'il manque) : Node.js,
+Rust (via rustup), scrcpy et ADB (`android-platform-tools`). Le scrcpy de
+Homebrew sert hors de l'app ; l'app compilée embarque celui de
+`scripts/download-scrcpy.sh`. Ensuite, utilisez `run.sh` comme sous Linux.
+
 ### Linux (Ubuntu / Fedora / Arch)
 
 ```bash
 bash install.sh
-source "$HOME/.cargo/env"   # Si Rust vient d'être installé
+source "$HOME/.cargo/env"           # Si Rust vient d'être installé
+bash scripts/download-scrcpy.sh     # scrcpy embarqué (obligatoire)
 ```
+
+> **Étape obligatoire** : aucun script d'installation ne télécharge le scrcpy
+> embarqué. `src-tauri/tauri.conf.json` déclare `resources/scrcpy/` comme
+> ressource, et la compilation échoue tant que ce dossier n'existe pas. Lancez
+> une fois, à la racine du dépôt :
+>
+> ```bash
+> bash scripts/download-scrcpy.sh   # scrcpy 4.1, empreinte SHA256 vérifiée
+> ```
 
 Ensuite, utilisez le script `run.sh` :
 
@@ -86,7 +111,7 @@ Ensuite, utilisez le script `run.sh` :
 ./run.sh install  # Crée un raccourci dans le menu des applications
 ```
 
-Le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, scrcpy (version récente depuis GitHub), ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman.
+Sous Linux, le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman. Pour scrcpy, il ne fait rien si un scrcpy 2.0 ou plus récent est déjà présent ; sinon il installe dans `/opt/scrcpy` la version 4.1 depuis GitHub, après vérification de son empreinte SHA256 épinglée.
 
 ### Installation manuelle
 
@@ -120,6 +145,9 @@ npm install
 ## Build de production
 
 ```bash
+# Prérequis : src-tauri/resources/scrcpy/ doit exister
+bash scripts/download-scrcpy.sh
+
 # Pour régénérer les icônes (si vous modifiez assets/app-icon.png) :
 npm run tauri icon -- assets/app-icon.png
 
@@ -127,6 +155,19 @@ npm run tauri build
 ```
 
 Les installeurs se trouvent dans `src-tauri/target/release/bundle/`.
+
+## Tests
+
+À lancer depuis la racine du dépôt :
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml   # backend Rust (nécessite src-tauri/resources/scrcpy/)
+npm test                                          # frontend (Vitest)
+bash scripts/tests/download-scrcpy.test.sh        # script de téléchargement de scrcpy
+```
+
+`cargo test` passe par le script de build de Tauri, qui exige le dossier de
+ressources : lancez `bash scripts/download-scrcpy.sh` avant, une seule fois.
 
 ## Utilisation
 
@@ -146,6 +187,11 @@ Les profils permettent de sauvegarder des configurations (résolution, FPS, déb
 **Méthode USB → WiFi (recommandée)**
 1. Branchez le téléphone en USB
 2. Cliquez sur **Passer en WiFi** sur la carte de l'appareil
+
+Le bouton lance `adb tcpip 5555`, qui redémarre le service ADB du téléphone :
+si un miroir USB est en cours sur cet appareil, l'app demande une confirmation,
+puis arrête ce miroir avant de basculer. Le port 5555 reste ensuite ouvert sur
+le téléphone jusqu'à son redémarrage ; la carte de l'appareil le rappelle.
 
 **Connexion directe**
 1. Cliquez sur l'icône WiFi dans la sidebar
@@ -170,36 +216,48 @@ Les profils permettent de sauvegarder des configurations (résolution, FPS, déb
 | Masquer la barre de titre | N'affiche que l'écran du téléphone, sans bandeau ni bordure (activé par défaut) |
 | Afficher les touches | Cercles visuels à chaque toucher (utile pour enregistrements) |
 
-> Le rendu est optimisé automatiquement selon la plateforme : **Direct3D** sur Windows, **OpenGL** sur Linux.
+> Le rendu est optimisé automatiquement selon la plateforme : **Direct3D** sur Windows, **Metal** sur macOS, **OpenGL** sur Linux.
 
 ## Architecture
 
 ```
 phonemirror/
-├── src-tauri/           # Backend Rust (Tauri 2)
+├── src-tauri/             # Backend Rust (Tauri 2)
 │   ├── src/
-│   │   ├── adb.rs       # Commandes ADB (liste, connexion, IP)
-│   │   ├── scrcpy.rs    # Gestion des processus scrcpy + config
-│   │   ├── profiles.rs  # Profils JSON persistés
-│   │   └── lib.rs       # Entry point Tauri
-│   └── tauri.conf.json  # Configuration Tauri (fenêtre, icônes…)
-├── src/                 # Frontend React + TypeScript
+│   │   ├── adb.rs             # Commandes ADB (liste, connexion, IP)
+│   │   ├── scrcpy.rs          # Lancement de scrcpy + config
+│   │   ├── process.rs         # Construction des commandes adb/scrcpy (sans console sous Windows)
+│   │   ├── mirror_table.rs    # Table des miroirs actifs par appareil
+│   │   ├── ipc_surface.rs     # Garde-fou : liste figée des commandes IPC exposées
+│   │   ├── profiles.rs        # Profils JSON persistés
+│   │   ├── lib.rs             # Entry point Tauri
+│   │   └── main.rs
+│   ├── resources/scrcpy/  # scrcpy embarqué (créé par scripts/download-scrcpy.sh, non versionné)
+│   └── tauri.conf.json    # Configuration Tauri (fenêtre, icônes, ressources)
+├── src/                   # Frontend React + TypeScript
 │   ├── components/
-│   │   ├── Titlebar.tsx       # Barre de titre personnalisée
-│   │   ├── Sidebar.tsx        # Navigation + toggle thème
-│   │   ├── DeviceCard.tsx     # Carte appareil (mirroring, profils, WiFi)
+│   │   ├── Titlebar.tsx        # Barre de titre personnalisée
+│   │   ├── Sidebar.tsx         # Navigation + toggle thème
+│   │   ├── DeviceCard.tsx      # Carte appareil (mirroring, profils, WiFi)
 │   │   ├── ProfileSelector.tsx # Dropdown profils sur chaque appareil
 │   │   ├── ConnectionModal.tsx # Modal connexion WiFi
-│   │   └── Tooltip.tsx        # Bulles d'info sur les paramètres
+│   │   └── Tooltip.tsx         # Bulles d'info sur les paramètres
 │   ├── pages/
 │   │   ├── Dashboard.tsx  # Liste des appareils connectés
 │   │   ├── Profiles.tsx   # Gestion des profils
 │   │   └── Settings.tsx   # Paramètres par défaut
+│   ├── styles/            # Design system : tokens.css, bundle.css, fonts/
 │   ├── store/             # État global Zustand
 │   ├── hooks/             # useDevices (polling ADB, setTimeout récursif non-chevauchant)
-│   ├── lib/tauri.ts       # Wrappers invoke Tauri
+│   ├── lib/               # tauri.ts (wrappers invoke Tauri), motion.ts (animations)
 │   └── types/             # Types TypeScript partagés
-└── install.ps1            # Script d'installation Windows (Node, Rust, scrcpy, ADB)
+├── scripts/
+│   ├── download-scrcpy.sh # Télécharge scrcpy 4.1 (SHA256 vérifié) dans src-tauri/resources/scrcpy/
+│   └── tests/             # Tests des scripts shell
+├── install.sh             # Installation macOS (Homebrew) et Linux (apt, dnf, pacman)
+├── run.sh                 # Compilation et lancement (macOS, Linux)
+├── install.ps1            # Installation Windows (Node, Rust, scrcpy, ADB)
+└── run.ps1                # Compilation et lancement (Windows)
 ```
 
 ## Stack technique

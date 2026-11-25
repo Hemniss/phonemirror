@@ -44,6 +44,8 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
   const [connectingWifi, setConnectingWifi] = useState(false);
   // `adb tcpip 5555` laisse le téléphone à l'écoute jusqu'à son redémarrage
   const [tcpipOpened, setTcpipOpened] = useState(false);
+  // « Passer en WiFi » relance adbd : un miroir USB en cours serait coupé
+  const [confirmWifi, setConfirmWifi] = useState(false);
 
   const isOnline = device.state === "device";
   const isUnauthorized = device.state === "unauthorized";
@@ -80,11 +82,17 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
     }
   };
 
-  const handleConnectWifi = async () => {
+  const switchToWifi = async () => {
     if (!device.ip_address) return;
     setError(null);
+    setConfirmWifi(false);
     setConnectingWifi(true);
     try {
+      // `adb tcpip` redémarre adbd : on arrête d'abord le miroir USB proprement
+      if (isMirroringActive) {
+        await stopMirror(device.serial);
+        setMirroring(device.serial, false);
+      }
       await enableTcpip(device.serial, 5555);
       // Attendre 1.5s que le mode TCP/IP soit activé
       await new Promise((r) => setTimeout(r, 1500));
@@ -96,6 +104,14 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
     } finally {
       setConnectingWifi(false);
     }
+  };
+
+  const handleConnectWifi = () => {
+    if (isMirroringActive) {
+      setConfirmWifi(true);
+      return;
+    }
+    void switchToWifi();
   };
 
   const handleDisconnect = async () => {
@@ -168,6 +184,30 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
         <div className="pm-note pm-warn">
           <Wifi size={15} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
           <p>Le port 5555 reste ouvert sur le téléphone jusqu'à son redémarrage.</p>
+        </div>
+      )}
+
+      {/* Confirmation : le passage en WiFi coupe le miroir USB en cours */}
+      {confirmWifi && isOnline && (
+        <div className="pm-note pm-warn" role="alert">
+          <AlertCircle size={15} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+          <div className="flex flex-col gap-2">
+            <p>Le passage en WiFi va arrêter le miroir en cours. Continuer ?</p>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton
+                onClick={() => void switchToWifi()}
+                icon={<Wifi size={14} aria-hidden="true" />}
+                label="Arrêter le miroir et passer en WiFi"
+                variant="danger"
+              />
+              <ActionButton
+                onClick={() => setConfirmWifi(false)}
+                icon={<Square size={14} aria-hidden="true" />}
+                label="Annuler"
+                variant="ghost"
+              />
+            </div>
+          </div>
         </div>
       )}
 
