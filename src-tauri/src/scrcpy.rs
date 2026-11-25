@@ -1,15 +1,13 @@
 use crate::adb::get_adb_path;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::Read;
+use crate::mirror_table::MirrorTable;
 use crate::process;
-use std::process::{Child, Stdio};
-use std::sync::Mutex;
+use std::process::Stdio;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 
 /// Gestion des processus scrcpy en cours d'exécution.
-pub struct ScrcpyProcesses(pub Mutex<HashMap<String, Child>>);
+pub type ScrcpyProcesses = MirrorTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MirrorConfig {
@@ -168,29 +166,13 @@ pub async fn start_mirror(
         cmd.env("PATH", enriched);
     }
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Impossible de démarrer scrcpy: {e}"))?;
+    // Inscrit avant l'attente : un stop_mirror pendant les 600 ms trouve le processus.
+    let pid = processes.spawn(&config.serial, &mut cmd)?;
 
     // Attendre 600 ms puis vérifier si scrcpy a déjà planté (flag invalide, device inaccessible, etc.)
+    // Le verrou de la table n'est pas tenu pendant cette attente.
     tokio::time::sleep(Duration::from_millis(600)).await;
-    if let Ok(Some(status)) = child.try_wait() {
-        let mut stderr_msg = String::new();
-        if let Some(mut stderr) = child.stderr.take() {
-            let _ = stderr.read_to_string(&mut stderr_msg);
-        }
-        let detail = stderr_msg.trim();
-        return Err(if detail.is_empty() {
-            format!("scrcpy a échoué (code {:?})", status.code())
-        } else {
-            format!("scrcpy: {detail}")
-        });
-    }
-
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    procs.insert(config.serial, child);
-
-    Ok(())
+    processes.confirm(&config.serial, pid)
 }
 
 /// Arrête le mirroring d'un appareil.
@@ -199,10 +181,7 @@ pub async fn stop_mirror(
     processes: State<'_, ScrcpyProcesses>,
     serial: String,
 ) -> Result<(), String> {
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    if let Some(mut child) = procs.remove(&serial) {
-        child.kill().map_err(|e| e.to_string())?;
-    }
+    processes.stop(&serial);
     Ok(())
 }
 
@@ -212,17 +191,5 @@ pub async fn is_mirroring(
     processes: State<'_, ScrcpyProcesses>,
     serial: String,
 ) -> Result<bool, String> {
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    if let Some(child) = procs.get_mut(&serial) {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                procs.remove(&serial);
-                Ok(false)
-            }
-            Ok(None) => Ok(true),
-            Err(_) => Ok(false),
-        }
-    } else {
-        Ok(false)
-    }
+    Ok(processes.is_running(&serial))
 }

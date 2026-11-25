@@ -1,18 +1,17 @@
 mod adb;
 mod ipc_surface;
+mod mirror_table;
 mod process;
 mod profiles;
 mod scrcpy;
 
 use scrcpy::ScrcpyProcesses;
-use std::collections::HashMap;
-use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(ScrcpyProcesses(Mutex::new(HashMap::new())))
+        .manage(ScrcpyProcesses::default())
         .invoke_handler(tauri::generate_handler![
             // ADB
             adb::list_devices,
