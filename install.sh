@@ -182,7 +182,7 @@ if ! command -v cargo &>/dev/null; then
 fi
 
 # ─── scrcpy ───────────────────────────────────────────────────────────────
-step "Installation de scrcpy (version récente depuis GitHub)..."
+step "Installation de scrcpy (4.1 épinglée par SHA256, sauf si scrcpy >= 2 est présent)..."
 SCRCPY_MIN_VERSION=2
 SCRCPY_INSTALLED_VERSION=0
 if command -v scrcpy &>/dev/null; then
