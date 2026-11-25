@@ -19,7 +19,6 @@ pub fn run() {
             adb::disconnect_device,
             adb::enable_tcpip,
             adb::pair_device,
-            adb::get_device_ip_address,
             // scrcpy / mirror
             scrcpy::start_mirror,
             scrcpy::stop_mirror,

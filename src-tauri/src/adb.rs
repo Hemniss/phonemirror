@@ -335,18 +335,6 @@ fn pair_with(adb: &Path, ip: &str, port: u16, code: &str) -> Result<(), String> 
     }
 }
 
-/// Retourne l'adresse IP WiFi d'un appareil USB.
-#[tauri::command]
-pub async fn get_device_ip_address(app: AppHandle, serial: String) -> Result<String, String> {
-    let adb = get_adb_path(&app)?;
-    blocking(move || {
-        get_device_info(&adb, &serial, true)
-            .ip
-            .ok_or_else(|| "IP introuvable".to_string())
-    })
-    .await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
