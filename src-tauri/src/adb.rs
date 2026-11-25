@@ -109,9 +109,10 @@ fn parse_devices(stdout: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Type de connexion déduit du serial.
+/// Type de connexion déduit du serial : `hôte:port` (TCP) ou nom de service
+/// mDNS (`adb-XXXX._adb-tls-connect._tcp`, Android 11+, sans `:`).
 fn connection_type(serial: &str) -> &'static str {
-    if serial.contains(':') {
+    if serial.contains(':') || serial.contains("._tcp") {
         "wireless"
     } else {
         "usb"
@@ -154,7 +155,9 @@ fn build_device(adb: &Path, serial: String, state: String) -> Device {
         };
     }
 
-    let info = get_device_info(adb, &serial, connection_type == "usb");
+    // USB ou serial mDNS : l'IP ne se lit pas dans le serial, on la demande au shell.
+    let serial_ip = extract_ip_from_serial(&serial);
+    let info = get_device_info(adb, &serial, serial_ip.is_none());
     Device {
         serial,
         model: info.model,
@@ -162,7 +165,7 @@ fn build_device(adb: &Path, serial: String, state: String) -> Device {
         state,
         connection_type,
         android_version: info.android_version,
-        ip_address: info.ip,
+        ip_address: serial_ip.or(info.ip),
     }
 }
 
@@ -230,12 +233,20 @@ fn parse_device_info(text: &str, fetch_ip: bool) -> DeviceInfo {
     }
 }
 
+/// IP contenue dans un serial `ip:port` ou `[ipv6]:port`. `None` pour un
+/// serial USB ou mDNS.
 fn extract_ip_from_serial(serial: &str) -> Option<String> {
-    if serial.contains(':') {
-        serial.split(':').next().map(|s| s.to_string())
-    } else {
-        None
-    }
+    let host = match serial.strip_prefix('[') {
+        Some(rest) => rest.split_once(']')?.0,
+        None => {
+            let (host, port) = serial.rsplit_once(':')?;
+            if host.contains(':') || port.parse::<u16>().is_err() {
+                return None;
+            }
+            host
+        }
+    };
+    (!host.is_empty()).then(|| host.to_string())
 }
 
 /// Connecte un appareil en WiFi via ADB.
@@ -452,5 +463,41 @@ esac"#,
         let info = parse_device_info("Pixel 7\npanther\n14\n", true);
         assert_eq!(info.model, "Pixel 7");
         assert_eq!(info.ip, None);
+    }
+
+    #[test]
+    fn connection_type_and_ip_from_serial() {
+        let mdns = "adb-R58M12345-AbCdEf._adb-tls-connect._tcp";
+        assert_eq!(connection_type(mdns), "wireless");
+        assert_eq!(extract_ip_from_serial(mdns), None);
+
+        assert_eq!(connection_type("[fe80::1]:5555"), "wireless");
+        assert_eq!(extract_ip_from_serial("[fe80::1]:5555").as_deref(), Some("fe80::1"));
+
+        assert_eq!(connection_type("192.168.1.20:5555"), "wireless");
+        assert_eq!(
+            extract_ip_from_serial("192.168.1.20:5555").as_deref(),
+            Some("192.168.1.20")
+        );
+
+        assert_eq!(connection_type("R58M12345"), "usb");
+        assert_eq!(extract_ip_from_serial("R58M12345"), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wireless_devices_get_an_ip() {
+        let adb = FakeAdb::new(
+            r#"case "$1" in
+  devices) printf 'List of devices attached\nadb-R58M12345-AbCdEf._adb-tls-connect._tcp device\n192.168.1.30:5555 device\n' ;;
+  -s) printf 'Pixel 7\npanther\n14\n'
+      case "$4" in *wlan0*) printf '    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n' ;; esac ;;
+esac"#,
+        );
+        let devices = list_devices_with(&adb.path).unwrap();
+        assert_eq!(devices[0].connection_type, "wireless");
+        assert_eq!(devices[0].ip_address.as_deref(), Some("192.168.1.20"));
+        assert_eq!(devices[1].connection_type, "wireless");
+        assert_eq!(devices[1].ip_address.as_deref(), Some("192.168.1.30"));
     }
 }
