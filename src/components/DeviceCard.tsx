@@ -12,7 +12,13 @@ import { clsx } from "clsx";
 import { useState } from "react";
 import { useAppStore } from "../store";
 import type { Device } from "../types";
-import { startMirror, stopMirror, enableTcpip, connectWireless } from "../lib/tauri";
+import {
+  startMirror,
+  stopMirror,
+  enableTcpip,
+  connectWireless,
+  disconnectDevice,
+} from "../lib/tauri";
 import ProfileSelector from "./ProfileSelector";
 import { delay } from "../lib/motion";
 
@@ -36,6 +42,8 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectingWifi, setConnectingWifi] = useState(false);
+  // `adb tcpip 5555` laisse le téléphone à l'écoute jusqu'à son redémarrage
+  const [tcpipOpened, setTcpipOpened] = useState(false);
 
   const isOnline = device.state === "device";
   const isUnauthorized = device.state === "unauthorized";
@@ -81,11 +89,22 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
       // Attendre 1.5s que le mode TCP/IP soit activé
       await new Promise((r) => setTimeout(r, 1500));
       await connectWireless(device.ip_address, 5555);
+      setTcpipOpened(true);
       onRefresh();
     } catch (err) {
       setError(String(err));
     } finally {
       setConnectingWifi(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setError(null);
+    try {
+      await disconnectDevice(device.serial);
+      onRefresh();
+    } catch (err) {
+      setError(String(err));
     }
   };
 
@@ -144,6 +163,14 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
         </div>
       )}
 
+      {/* Port ADB laissé ouvert après « Passer en WiFi » */}
+      {tcpipOpened && (
+        <div className="pm-note pm-warn">
+          <Wifi size={15} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+          <p>Le port 5555 reste ouvert sur le téléphone jusqu'à son redémarrage.</p>
+        </div>
+      )}
+
       {/* Actions */}
       {isOnline && (
         <div className="flex flex-wrap gap-2">
@@ -158,7 +185,7 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
           />
 
           {/* Profils */}
-          <ProfileSelector device={device} />
+          <ProfileSelector device={device} onError={setError} />
 
           {/* Connexion WiFi (si USB et IP connue) */}
           {device.connection_type === "usb" && device.ip_address && (
@@ -174,11 +201,7 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
           {/* Déconnecter WiFi */}
           {device.connection_type === "wireless" && (
             <ActionButton
-              onClick={async () => {
-                const { disconnectDevice } = await import("../lib/tauri");
-                await disconnectDevice(device.serial);
-                onRefresh();
-              }}
+              onClick={handleDisconnect}
               icon={<WifiOff size={14} aria-hidden="true" />}
               label="Déconnecter"
               variant="ghost"

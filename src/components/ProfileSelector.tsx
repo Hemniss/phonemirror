@@ -1,15 +1,17 @@
 import { Bookmark, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "../store";
-import { startMirror } from "../lib/tauri";
+import { startMirror, stopMirror } from "../lib/tauri";
 import type { Device } from "../types";
 
 interface Props {
   device: Device;
+  /** Reçoit le message d'erreur à afficher sur la carte (null pour l'effacer) */
+  onError: (message: string | null) => void;
 }
 
-export default function ProfileSelector({ device }: Props) {
-  const { profiles, setMirroring, defaultSettings } = useAppStore();
+export default function ProfileSelector({ device, onError }: Props) {
+  const { profiles, mirroringSerials, setMirroring, defaultSettings } = useAppStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -32,23 +34,35 @@ export default function ProfileSelector({ device }: Props) {
     if (!profile) return;
     setOpen(false);
 
-    await startMirror({
-      serial: device.serial,
-      max_fps: profile.max_fps,
-      max_size: profile.max_size,
-      bitrate: profile.bitrate,
-      video_buffer: profile.video_buffer,
-      enable_audio: profile.enable_audio,
-      always_on_top: profile.always_on_top,
-      fullscreen: false,
-      // Les profils ne couvrent pas ce réglage : on suit la préférence globale.
-      borderless: defaultSettings.borderless,
-      show_touches: profile.show_touches,
-      rotation: null,
-      record_path: null,
-      window_title: `${device.model} — ${profile.name}`,
-    });
-    setMirroring(device.serial, true);
+    onError(null);
+    try {
+      // Un miroir tourne déjà : l'arrêter d'abord, sinon le premier scrcpy
+      // reste ouvert et n'est plus suivi par l'interface.
+      if (mirroringSerials.includes(device.serial)) {
+        await stopMirror(device.serial);
+        setMirroring(device.serial, false);
+      }
+
+      await startMirror({
+        serial: device.serial,
+        max_fps: profile.max_fps,
+        max_size: profile.max_size,
+        bitrate: profile.bitrate,
+        video_buffer: profile.video_buffer,
+        enable_audio: profile.enable_audio,
+        always_on_top: profile.always_on_top,
+        fullscreen: false,
+        // Les profils ne couvrent pas ce réglage : on suit la préférence globale.
+        borderless: defaultSettings.borderless,
+        show_touches: profile.show_touches,
+        rotation: null,
+        record_path: null,
+        window_title: `${device.model} — ${profile.name}`,
+      });
+      setMirroring(device.serial, true);
+    } catch (err) {
+      onError(String(err));
+    }
   };
 
   if (relevantProfiles.length === 0) return null;
