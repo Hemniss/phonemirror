@@ -19,10 +19,6 @@ interface AppState {
   mirroringSerials: string[];
   setMirroring: (serial: string, active: boolean) => void;
 
-  // Enregistrement en cours
-  recordingSerials: string[];
-  setRecording: (serial: string, active: boolean) => void;
-
   // Paramètres par défaut
   defaultSettings: DefaultSettings;
   updateDefaultSettings: (settings: Partial<DefaultSettings>) => void;
@@ -71,14 +67,6 @@ export const useAppStore = create<AppState>()(
           mirroringSerials: active
             ? [...state.mirroringSerials.filter((s) => s !== serial), serial]
             : state.mirroringSerials.filter((s) => s !== serial),
-        })),
-
-      recordingSerials: [],
-      setRecording: (serial, active) =>
-        set((state) => ({
-          recordingSerials: active
-            ? [...state.recordingSerials.filter((s) => s !== serial), serial]
-            : state.recordingSerials.filter((s) => s !== serial),
         })),
 
       defaultSettings: DEFAULT_SETTINGS,
