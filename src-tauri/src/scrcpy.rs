@@ -1,15 +1,13 @@
 use crate::adb::get_adb_path;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::Read;
+use crate::mirror_table::MirrorTable;
 use crate::process;
-use std::process::{Child, Stdio};
-use std::sync::Mutex;
+use std::process::Stdio;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 
 /// Gestion des processus scrcpy en cours d'exécution.
-pub struct ScrcpyProcesses(pub Mutex<HashMap<String, Child>>);
+pub type ScrcpyProcesses = MirrorTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MirrorConfig {
@@ -27,8 +25,6 @@ pub struct MirrorConfig {
     #[serde(default)]
     pub borderless: bool,
     pub show_touches: bool,
-    pub rotation: Option<u32>,
-    pub record_path: Option<String>,
     pub window_title: Option<String>,
 }
 
@@ -74,15 +70,8 @@ fn get_scrcpy_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Err(format!("scrcpy introuvable. {HINT}"))
 }
 
-/// Démarre le mirroring d'un appareil avec la configuration donnée.
-#[tauri::command]
-pub async fn start_mirror(
-    app: AppHandle,
-    processes: State<'_, ScrcpyProcesses>,
-    config: MirrorConfig,
-) -> Result<(), String> {
-    let scrcpy = get_scrcpy_path(&app)?;
-
+/// Construit les arguments de scrcpy pour une configuration. Fonction pure.
+pub fn build_scrcpy_args(config: &MirrorConfig) -> Vec<String> {
     let mut args: Vec<String> = vec!["-s".to_string(), config.serial.clone()];
 
     if let Some(fps) = config.max_fps {
@@ -134,11 +123,6 @@ pub async fn start_mirror(
         args.push("--show-touches".to_string());
     }
 
-    if let Some(rot) = config.rotation {
-        args.push("--lock-video-orientation".to_string());
-        args.push(rot.to_string());
-    }
-
     if let Some(title) = &config.window_title {
         args.push("--window-title".to_string());
         args.push(title.clone());
@@ -147,10 +131,19 @@ pub async fn start_mirror(
         args.push("PhoneMirror".to_string());
     }
 
-    if let Some(path) = &config.record_path {
-        args.push("-r".to_string());
-        args.push(path.clone());
-    }
+    args
+}
+
+/// Démarre le mirroring d'un appareil avec la configuration donnée.
+#[tauri::command]
+pub async fn start_mirror(
+    app: AppHandle,
+    processes: State<'_, ScrcpyProcesses>,
+    config: MirrorConfig,
+) -> Result<(), String> {
+    let scrcpy = get_scrcpy_path(&app)?;
+
+    let args = build_scrcpy_args(&config);
 
     let adb = get_adb_path(&app)?;
 
@@ -174,29 +167,13 @@ pub async fn start_mirror(
         cmd.env("PATH", enriched);
     }
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Impossible de démarrer scrcpy: {e}"))?;
+    // Inscrit avant l'attente : un stop_mirror pendant les 600 ms trouve le processus.
+    let pid = processes.spawn(&config.serial, &mut cmd)?;
 
     // Attendre 600 ms puis vérifier si scrcpy a déjà planté (flag invalide, device inaccessible, etc.)
+    // Le verrou de la table n'est pas tenu pendant cette attente.
     tokio::time::sleep(Duration::from_millis(600)).await;
-    if let Ok(Some(status)) = child.try_wait() {
-        let mut stderr_msg = String::new();
-        if let Some(mut stderr) = child.stderr.take() {
-            let _ = stderr.read_to_string(&mut stderr_msg);
-        }
-        let detail = stderr_msg.trim();
-        return Err(if detail.is_empty() {
-            format!("scrcpy a échoué (code {:?})", status.code())
-        } else {
-            format!("scrcpy: {detail}")
-        });
-    }
-
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    procs.insert(config.serial, child);
-
-    Ok(())
+    processes.confirm(&config.serial, pid)
 }
 
 /// Arrête le mirroring d'un appareil.
@@ -205,10 +182,7 @@ pub async fn stop_mirror(
     processes: State<'_, ScrcpyProcesses>,
     serial: String,
 ) -> Result<(), String> {
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    if let Some(mut child) = procs.remove(&serial) {
-        child.kill().map_err(|e| e.to_string())?;
-    }
+    processes.stop(&serial);
     Ok(())
 }
 
@@ -218,57 +192,155 @@ pub async fn is_mirroring(
     processes: State<'_, ScrcpyProcesses>,
     serial: String,
 ) -> Result<bool, String> {
-    let mut procs = processes.0.lock().map_err(|e| e.to_string())?;
-    if let Some(child) = procs.get_mut(&serial) {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                procs.remove(&serial);
-                Ok(false)
-            }
-            Ok(None) => Ok(true),
-            Err(_) => Ok(false),
+    Ok(processes.is_running(&serial))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base() -> MirrorConfig {
+        MirrorConfig {
+            serial: "R58M12345".into(),
+            max_fps: None,
+            max_size: None,
+            bitrate: None,
+            video_buffer: None,
+            enable_audio: false,
+            always_on_top: false,
+            fullscreen: false,
+            borderless: false,
+            show_touches: false,
+            window_title: None,
         }
-    } else {
-        Ok(false)
     }
-}
 
-/// Envoie un fichier du PC vers l'appareil Android.
-#[tauri::command]
-pub async fn push_file(
-    app: AppHandle,
-    serial: String,
-    local_path: String,
-    remote_path: String,
-) -> Result<(), String> {
-    let adb = get_adb_path(&app)?;
-    let output = process::command(&adb)
-        .args(["-s", &serial, "push", &local_path, &remote_path])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    /// Configuration où toutes les options sont actives.
+    fn full() -> MirrorConfig {
+        MirrorConfig {
+            max_fps: Some(60),
+            max_size: Some(1920),
+            bitrate: Some(8),
+            video_buffer: Some(50),
+            enable_audio: true,
+            always_on_top: true,
+            fullscreen: true,
+            borderless: true,
+            show_touches: true,
+            window_title: Some("Mon téléphone".into()),
+            ..base()
+        }
     }
-    Ok(())
-}
 
-/// Récupère un fichier de l'appareil Android vers le PC.
-#[tauri::command]
-pub async fn pull_file(
-    app: AppHandle,
-    serial: String,
-    remote_path: String,
-    local_path: String,
-) -> Result<(), String> {
-    let adb = get_adb_path(&app)?;
-    let output = process::command(&adb)
-        .args(["-s", &serial, "pull", &remote_path, &local_path])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    fn has(args: &[String], needle: &[&str]) -> bool {
+        args.windows(needle.len())
+            .any(|w| w.iter().zip(needle).all(|(a, b)| a == b))
     }
-    Ok(())
+
+    #[test]
+    fn serial_always_first() {
+        assert_eq!(&build_scrcpy_args(&base())[..2], ["-s", "R58M12345"]);
+    }
+
+    #[test]
+    fn max_fps() {
+        assert!(!build_scrcpy_args(&base()).contains(&"--max-fps".into()));
+        let c = MirrorConfig { max_fps: Some(60), ..base() };
+        assert!(has(&build_scrcpy_args(&c), &["--max-fps", "60"]));
+    }
+
+    #[test]
+    fn max_size() {
+        assert!(!build_scrcpy_args(&base()).contains(&"-m".into()));
+        let c = MirrorConfig { max_size: Some(1920), ..base() };
+        assert!(has(&build_scrcpy_args(&c), &["-m", "1920"]));
+    }
+
+    #[test]
+    fn bitrate() {
+        assert!(!build_scrcpy_args(&base()).contains(&"-b".into()));
+        let c = MirrorConfig { bitrate: Some(8), ..base() };
+        assert!(has(&build_scrcpy_args(&c), &["-b", "8M"]));
+    }
+
+    #[test]
+    fn video_buffer() {
+        let off = build_scrcpy_args(&base());
+        assert!(!off.iter().any(|a| a.starts_with("--video-buffer")));
+        let c = MirrorConfig { video_buffer: Some(50), ..base() };
+        assert!(build_scrcpy_args(&c).contains(&"--video-buffer=50".into()));
+    }
+
+    #[test]
+    fn audio() {
+        let off = build_scrcpy_args(&base());
+        assert!(off.contains(&"--no-audio".into()));
+        assert!(!off.contains(&"--audio-source=output".into()));
+        let on = build_scrcpy_args(&MirrorConfig { enable_audio: true, ..base() });
+        assert!(on.contains(&"--audio-source=output".into()));
+        assert!(!on.contains(&"--no-audio".into()));
+    }
+
+    #[test]
+    fn boolean_flags() {
+        let off = build_scrcpy_args(&base());
+        let on = build_scrcpy_args(&MirrorConfig {
+            always_on_top: true,
+            fullscreen: true,
+            borderless: true,
+            show_touches: true,
+            ..base()
+        });
+        for flag in ["--always-on-top", "--fullscreen", "--window-borderless", "--show-touches"] {
+            assert!(!off.contains(&flag.into()), "{flag} présent sans être demandé");
+            assert!(on.contains(&flag.into()), "{flag} absent alors que demandé");
+        }
+    }
+
+    #[test]
+    fn window_title() {
+        assert!(has(&build_scrcpy_args(&base()), &["--window-title", "PhoneMirror"]));
+        let c = MirrorConfig { window_title: Some("Pixel".into()), ..base() };
+        assert!(has(&build_scrcpy_args(&c), &["--window-title", "Pixel"]));
+    }
+
+    #[test]
+    fn render_driver_per_platform() {
+        let args = build_scrcpy_args(&base());
+        let drivers: Vec<_> = args.iter().filter(|a| a.starts_with("--render-driver=")).collect();
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        assert_eq!(drivers.len(), 1);
+        #[cfg(target_os = "macos")]
+        assert_eq!(drivers[0], "--render-driver=metal");
+        #[cfg(target_os = "windows")]
+        assert_eq!(drivers[0], "--render-driver=direct3d");
+        #[cfg(target_os = "linux")]
+        assert_eq!(drivers[0], "--render-driver=opengl");
+    }
+
+    /// Fait valider toutes les options par le scrcpy embarqué : `--version`
+    /// s'exécute après l'analyse des arguments, sans téléphone.
+    #[test]
+    fn bundled_scrcpy_accepts_all_options() {
+        #[cfg(target_os = "windows")]
+        let rel = "resources/scrcpy/scrcpy.exe";
+        #[cfg(not(target_os = "windows"))]
+        let rel = "resources/scrcpy/scrcpy";
+        let bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel);
+        if !bin.exists() {
+            eprintln!("test ignoré : binaire scrcpy absent ({})", bin.display());
+            return;
+        }
+        let out = std::process::Command::new(&bin)
+            .args(build_scrcpy_args(&full()))
+            .arg("--version")
+            .output()
+            .expect("lancement de scrcpy impossible");
+        assert!(
+            out.status.success(),
+            "scrcpy refuse les arguments (code {:?}) : {}",
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
 }

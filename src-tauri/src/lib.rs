@@ -1,17 +1,18 @@
 mod adb;
+mod ipc_surface;
+mod mirror_table;
 mod process;
 mod profiles;
 mod scrcpy;
 
 use scrcpy::ScrcpyProcesses;
-use std::collections::HashMap;
-use std::sync::Mutex;
+use tauri::{Manager, RunEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(ScrcpyProcesses(Mutex::new(HashMap::new())))
+        .manage(ScrcpyProcesses::default())
         .invoke_handler(tauri::generate_handler![
             // ADB
             adb::list_devices,
@@ -24,13 +25,17 @@ pub fn run() {
             scrcpy::start_mirror,
             scrcpy::stop_mirror,
             scrcpy::is_mirroring,
-            scrcpy::push_file,
-            scrcpy::pull_file,
             // Profils
             profiles::get_profiles,
             profiles::save_profile,
             profiles::delete_profile,
         ])
-        .run(tauri::generate_context!())
-        .expect("Erreur lors du lancement de PhoneMirror");
+        .build(tauri::generate_context!())
+        .expect("Erreur lors du lancement de PhoneMirror")
+        .run(|app, event| {
+            // Fermer l'app ne doit pas laisser de fenêtre scrcpy orpheline.
+            if let RunEvent::Exit = event {
+                app.state::<ScrcpyProcesses>().stop_all();
+            }
+        });
 }
