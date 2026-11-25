@@ -33,22 +33,47 @@ to_native_path() {
     fi
 }
 
-# Vérifie l'empreinte SHA256 d'un fichier contre le SHA256SUMS.txt de la release.
-# On exécute ces binaires et on les redistribue : l'intégrité doit être vérifiée.
+# Empreintes SHA256 de la version par défaut, relevées le 25/11/2026 dans le
+# SHA256SUMS.txt de la release v4.1 (et revérifiées). Elles priment sur le
+# fichier de sommes téléchargé, qui vient du même endroit que l'archive.
+# install.sh installe aussi scrcpy 4.1 sous Linux : garder les deux alignés.
+pinned_sha256() {
+    case "$1" in
+        scrcpy-linux-x86_64-v4.1.tar.gz)  echo "ad56ae8bfeedf41e824945c11dbf55fcb092b3e615b9b486f48a50e30d389635" ;;
+        scrcpy-win64-v4.1.zip)            echo "5b12172b3264b2889f4583ee64752ce832e29bc8b1089dca81093459697165db" ;;
+        scrcpy-macos-aarch64-v4.1.tar.gz) echo "20fd47c9014dd5e0fa77091f3cb7adbda8445a360c4584aeaa0150b5b3988ff3" ;;
+        scrcpy-macos-x86_64-v4.1.tar.gz)  echo "ee2a7223bc8dbdc4f482db1134bcf441178dafb833492b71ca4c22090c58ce72" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Vérifie l'empreinte SHA256 d'une archive avant toute extraction.
+# On exécute ces binaires et on les redistribue : tout échec arrête le script.
+# Seule SCRCPY_SKIP_CHECKSUM=1 permet de passer outre (jamais en CI).
 verify_checksum() {
     local file="$1" name="$2"
 
-    local sums="$TMP/SHA256SUMS.txt"
-    if ! curl -fsSL -o "$sums" "$BASE_URL/SHA256SUMS.txt" 2>/dev/null; then
-        echo "⚠️  SHA256SUMS.txt indisponible — vérification ignorée"
+    if [ "${SCRCPY_SKIP_CHECKSUM:-}" = "1" ]; then
+        echo "⚠️  ATTENTION : SCRCPY_SKIP_CHECKSUM=1 — empreinte SHA256 NON vérifiée pour $name"
         return 0
     fi
 
-    local expected
-    expected="$(grep -F " $name" "$sums" | head -1 | awk '{print $1}')"
+    local expected source
+    expected="$(pinned_sha256 "$name")"
+    source="empreinte épinglée dans le script"
     if [ -z "$expected" ]; then
-        echo "⚠️  Empreinte absente pour $name — vérification ignorée"
-        return 0
+        local sums="$TMP/SHA256SUMS.txt"
+        if ! curl -fsSL -o "$sums" "$BASE_URL/SHA256SUMS.txt" 2>/dev/null; then
+            echo "❌ SHA256SUMS.txt indisponible pour v$SCRCPY_VERSION : vérification impossible"
+            echo "   (SCRCPY_SKIP_CHECKSUM=1 pour passer outre, à vos risques)"
+            exit 1
+        fi
+        expected="$(grep -F " $name" "$sums" | head -1 | awk '{print $1}' || true)"
+        source="SHA256SUMS.txt de la release"
+        if [ -z "$expected" ]; then
+            echo "❌ Empreinte absente de SHA256SUMS.txt pour $name"
+            exit 1
+        fi
     fi
 
     local actual
@@ -57,17 +82,17 @@ verify_checksum() {
     elif command -v shasum >/dev/null 2>&1; then
         actual="$(shasum -a 256 "$file" | awk '{print $1}')"
     else
-        echo "⚠️  Aucun outil SHA256 — vérification ignorée"
-        return 0
+        echo "❌ Aucun outil SHA256 (sha256sum ou shasum) : vérification impossible"
+        exit 1
     fi
 
     if [ "$actual" != "$expected" ]; then
-        echo "❌ Empreinte SHA256 invalide pour $name"
+        echo "❌ Empreinte SHA256 invalide pour $name ($source)"
         echo "   attendu : $expected"
         echo "   obtenu  : $actual"
         exit 1
     fi
-    echo "🔒 SHA256 vérifiée"
+    echo "🔒 SHA256 vérifiée ($source)"
 }
 
 # Extrait une archive ZIP sans dépendre d'unzip (absent de Git for Windows).
