@@ -320,4 +320,21 @@ mod tests {
         assert!(quarantined(&dir).is_empty());
         assert!(path.is_dir());
     }
+
+    #[test]
+    fn relit_un_profil_sans_video_buffer() {
+        let dir = TestDir::new("compat");
+        let path = dir.file();
+        fs::write(
+            &path,
+            r#"[{"id":"a","name":"Jeu","device_serial":null,"max_fps":60,"max_size":1080,"bitrate":8,
+  "enable_audio":true,"always_on_top":false,"show_touches":false,"created_at":"2026-08-22T20:00:00Z"}]"#,
+        )
+        .unwrap();
+        let profiles = load_profiles_at(&path).unwrap();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].name, "Jeu");
+        assert_eq!(profiles[0].max_fps, 60);
+        assert_eq!(profiles[0].video_buffer, 0);
+    }
 }
