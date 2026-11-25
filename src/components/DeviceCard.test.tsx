@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeviceCard from "./DeviceCard";
 import { useAppStore } from "../store";
-import { disconnectDevice, startMirror, stopMirror } from "../lib/tauri";
+import {
+  connectWireless,
+  disconnectDevice,
+  enableTcpip,
+  startMirror,
+  stopMirror,
+} from "../lib/tauri";
 import type { Device, Profile } from "../types";
 
 vi.mock("../lib/tauri", () => ({
@@ -91,5 +97,24 @@ describe("DeviceCard — erreurs affichées (B2)", () => {
     });
 
     expect(screen.getByText("adb: injoignable")).toBeTruthy();
+  });
+});
+
+describe("DeviceCard — passage en WiFi (E2)", () => {
+  it("après un passage réussi, la note sur le port 5555 est visible", async () => {
+    vi.useFakeTimers();
+    vi.mocked(enableTcpip).mockResolvedValue(undefined);
+    vi.mocked(connectWireless).mockResolvedValue("connected");
+    const usb: Device = { ...PHONE, ip_address: "10.0.0.2" };
+    render(<DeviceCard device={usb} onRefresh={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Passer en WiFi" }));
+    await act(() => vi.advanceTimersByTimeAsync(1500));
+    vi.useRealTimers();
+
+    expect(vi.mocked(connectWireless)).toHaveBeenCalledWith("10.0.0.2", 5555);
+    expect(
+      screen.getByText("Le port 5555 reste ouvert sur le téléphone jusqu'à son redémarrage.")
+    ).toBeTruthy();
   });
 });
