@@ -275,9 +275,24 @@ pub async fn disconnect_device(app: AppHandle, serial: String) -> Result<(), Str
     blocking(move || disconnect_with(&adb, &serial)).await
 }
 
+/// Échec si adb sort en erreur ou écrit une ligne `error: …` (certaines
+/// versions d'adb sortent en 0 malgré l'erreur).
 fn disconnect_with(adb: &Path, serial: &str) -> Result<(), String> {
-    run_adb(adb, &["disconnect", serial], NETWORK_TIMEOUT)?;
-    Ok(())
+    let output = run_adb(adb, &["disconnect", serial], NETWORK_TIMEOUT)?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let message = format!("{} {}", stdout.trim(), stderr.trim());
+    let message = message.trim();
+
+    let reports_error = stdout
+        .lines()
+        .chain(stderr.lines())
+        .any(|l| l.trim_start().starts_with("error:"));
+    if output.status.success() && !reports_error {
+        Ok(())
+    } else {
+        Err(format!("Déconnexion échouée: {message}"))
+    }
 }
 
 /// Active le mode TCP/IP sur un appareil USB (préparation connexion WiFi).
@@ -499,5 +514,28 @@ esac"#,
         assert_eq!(devices[0].ip_address.as_deref(), Some("192.168.1.20"));
         assert_eq!(devices[1].connection_type, "wireless");
         assert_eq!(devices[1].ip_address.as_deref(), Some("192.168.1.30"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disconnect_reports_adb_error() {
+        let adb = FakeAdb::new("echo \"error: no such device '$2'\" >&2; exit 1");
+        let err = disconnect_with(&adb.path, "1.2.3.4:5555").unwrap_err();
+        assert!(err.contains("error: no such device '1.2.3.4:5555'"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disconnect_reports_error_printed_on_stdout_with_status_zero() {
+        let adb = FakeAdb::new("echo \"error: no such device '$2'\"; exit 0");
+        let err = disconnect_with(&adb.path, "1.2.3.4:5555").unwrap_err();
+        assert!(err.contains("error: no such device '1.2.3.4:5555'"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disconnect_succeeds() {
+        let adb = FakeAdb::new("echo \"disconnected $2\"; exit 0");
+        assert_eq!(disconnect_with(&adb.path, "1.2.3.4:5555"), Ok(()));
     }
 }
