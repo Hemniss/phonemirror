@@ -21,7 +21,8 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos-arm64
-          - os: macos-13
+          # macos-13 a été retiré par GitHub le 4 décembre 2025.
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             platform: macos-intel
 
@@ -71,6 +72,25 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # Tests avant le build : scrcpy est déjà téléchargé (étape plus haut),
+      # ce dont les tests Rust ont besoin ; dist/ ne l'est pas.
+      # dist/ vide créé par précaution : selon la version de Tauri,
+      # generate_context! peut exiger que frontendDist existe à la
+      # compilation. tauri-action le remplit ensuite (beforeBuildCommand).
+      - name: Rust tests
+        shell: bash
+        run: |
+          mkdir -p dist
+          cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Frontend tests
+        run: npm run test --if-present
+
+      - name: Script tests
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash scripts/tests/download-scrcpy.test.sh
 
       - name: Build Tauri application
         uses: tauri-apps/tauri-action@v0
