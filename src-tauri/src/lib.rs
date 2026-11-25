@@ -6,6 +6,7 @@ mod profiles;
 mod scrcpy;
 
 use scrcpy::ScrcpyProcesses;
+use tauri::{Manager, RunEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -29,6 +30,12 @@ pub fn run() {
             profiles::save_profile,
             profiles::delete_profile,
         ])
-        .run(tauri::generate_context!())
-        .expect("Erreur lors du lancement de PhoneMirror");
+        .build(tauri::generate_context!())
+        .expect("Erreur lors du lancement de PhoneMirror")
+        .run(|app, event| {
+            // Fermer l'app ne doit pas laisser de fenêtre scrcpy orpheline.
+            if let RunEvent::Exit = event {
+                app.state::<ScrcpyProcesses>().stop_all();
+            }
+        });
 }

@@ -70,6 +70,14 @@ impl MirrorTable {
         }
     }
 
+    /// Arrête et attend tous les processus inscrits (fermeture de l'app).
+    pub fn stop_all(&self) {
+        let children: Vec<Child> = self.lock().drain().map(|(_, c)| c).collect();
+        for child in children {
+            terminate(child);
+        }
+    }
+
     /// Indique si `serial` a un processus vivant ; retire l'entrée sinon.
     pub fn is_running(&self, serial: &str) -> bool {
         let mut procs = self.lock();
@@ -184,5 +192,24 @@ mod tests {
         assert_eq!(ps_stat(pid), "", "processus encore présent (zombie ?) après l'arrêt");
         // Un second arrêt sur une entrée absente ne doit pas échouer.
         table.stop("dev");
+    }
+
+    #[test]
+    fn stop_all_terminates_every_process() {
+        let table = MirrorTable::default();
+        let mut pids = Vec::new();
+        for serial in ["a", "b", "c"] {
+            pids.push(table.spawn(serial, &mut sleeper()).unwrap());
+        }
+        let _reaper = Reaper(pids.clone());
+
+        table.stop_all();
+
+        for pid in pids {
+            assert_eq!(ps_stat(pid), "", "PID {pid} encore présent après stop_all");
+        }
+        for serial in ["a", "b", "c"] {
+            assert!(!table.is_running(serial));
+        }
     }
 }
