@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeviceCard from "./DeviceCard";
 import { useAppStore } from "../store";
-import { startMirror, stopMirror } from "../lib/tauri";
+import { disconnectDevice, startMirror, stopMirror } from "../lib/tauri";
 import type { Device, Profile } from "../types";
 
 vi.mock("../lib/tauri", () => ({
@@ -67,5 +67,29 @@ describe("DeviceCard — profils", () => {
     await act(async () => resolveStop());
     expect(mockStart).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().mirroringSerials).toEqual(["abc"]);
+  });
+});
+
+describe("DeviceCard — erreurs affichées (B2)", () => {
+  it("startMirror rejeté depuis un profil → message sur la carte, pas de miroir", async () => {
+    mockStart.mockRejectedValue("scrcpy introuvable");
+    render(<DeviceCard device={PHONE} onRefresh={() => {}} />);
+
+    await chooseProfile();
+
+    expect(screen.getByText("scrcpy introuvable")).toBeTruthy();
+    expect(useAppStore.getState().mirroringSerials).toEqual([]);
+  });
+
+  it("disconnectDevice rejeté → message sur la carte", async () => {
+    vi.mocked(disconnectDevice).mockRejectedValue("adb: injoignable");
+    const wifi: Device = { ...PHONE, serial: "10.0.0.2:5555", connection_type: "wireless" };
+    render(<DeviceCard device={wifi} onRefresh={() => {}} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Déconnecter" }));
+    });
+
+    expect(screen.getByText("adb: injoignable")).toBeTruthy();
   });
 });
