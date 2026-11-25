@@ -41,13 +41,22 @@ impl MirrorTable {
     /// - processus déjà terminé : retiré de la table, erreur avec stderr ;
     /// - entrée absente ou autre PID (arrêt ou remplacement pendant
     ///   l'attente) : rien n'est réinscrit, `Ok(())` ;
-    /// - processus vivant : il reste inscrit.
+    /// - processus vivant : il reste inscrit, et un thread vide désormais son
+    ///   stderr, sans quoi scrcpy bloquerait à l'écriture une fois le tube
+    ///   plein (64 Kio).
     pub fn confirm(&self, serial: &str, pid: u32) -> Result<(), String> {
         let mut procs = self.lock();
         let exited = match procs.get_mut(serial) {
             Some(child) if child.id() == pid => match child.try_wait() {
                 Ok(Some(status)) => Some(status),
-                _ => None,
+                _ => {
+                    if let Some(mut stderr) = child.stderr.take() {
+                        std::thread::spawn(move || {
+                            let _ = std::io::copy(&mut stderr, &mut std::io::sink());
+                        });
+                    }
+                    None
+                }
             },
             _ => return Ok(()),
         };
@@ -211,5 +220,43 @@ mod tests {
         for serial in ["a", "b", "c"] {
             assert!(!table.is_running(serial));
         }
+    }
+
+    #[test]
+    fn chatty_stderr_does_not_block() {
+        use std::process::Stdio;
+        use std::time::{Duration, Instant};
+
+        // Faux scrcpy qui écrit 200 Kio sur stderr (plus que le tampon d'un tube) puis sort.
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "head -c 204800 /dev/zero >&2"])
+            .stderr(Stdio::piped());
+        let table = MirrorTable::default();
+        let pid = table.spawn("dev", &mut cmd).unwrap();
+        let _reaper = Reaper(vec![pid]);
+        table.confirm("dev", pid).unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while table.is_running("dev") && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let still_running = table.is_running("dev");
+        table.stop("dev");
+        assert!(!still_running, "scrcpy bloqué à l'écriture sur stderr");
+    }
+
+    #[test]
+    fn early_failure_reports_stderr() {
+        use std::process::Stdio;
+
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", "echo 'option inconnue' >&2; exit 1"])
+            .stderr(Stdio::piped());
+        let table = MirrorTable::default();
+        let pid = table.spawn("dev", &mut cmd).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let err = table.confirm("dev", pid).unwrap_err();
+        assert_eq!(err, "scrcpy: option inconnue");
+        assert!(!table.is_running("dev"));
     }
 }
