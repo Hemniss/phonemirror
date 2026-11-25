@@ -117,4 +117,73 @@ describe("DeviceCard — passage en WiFi (E2)", () => {
       screen.getByText("Le port 5555 reste ouvert sur le téléphone jusqu'à son redémarrage.")
     ).toBeTruthy();
   });
+
+  it("miroir inactif → pas de confirmation, stopMirror n'est pas appelé", async () => {
+    vi.useFakeTimers();
+    vi.mocked(enableTcpip).mockClear().mockResolvedValue(undefined);
+    vi.mocked(connectWireless).mockResolvedValue("connected");
+    const usb: Device = { ...PHONE, ip_address: "10.0.0.2" };
+    render(<DeviceCard device={usb} onRefresh={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Passer en WiFi" }));
+    await act(() => vi.advanceTimersByTimeAsync(1500));
+    vi.useRealTimers();
+
+    expect(screen.queryByText(/va arrêter le miroir/)).toBeNull();
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(vi.mocked(enableTcpip)).toHaveBeenCalledWith("abc", 5555);
+  });
+
+  it("miroir actif → confirmation demandée, rien n'est lancé avant", () => {
+    useAppStore.setState({ mirroringSerials: ["abc"] });
+    vi.mocked(enableTcpip).mockClear();
+    const usb: Device = { ...PHONE, ip_address: "10.0.0.2" };
+    render(<DeviceCard device={usb} onRefresh={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Passer en WiFi" }));
+
+    expect(screen.getByText(/va arrêter le miroir en cours/)).toBeTruthy();
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(vi.mocked(enableTcpip)).not.toHaveBeenCalled();
+  });
+
+  it("miroir actif + annuler → miroir conservé, pas de tcpip", () => {
+    useAppStore.setState({ mirroringSerials: ["abc"] });
+    vi.mocked(enableTcpip).mockClear();
+    const usb: Device = { ...PHONE, ip_address: "10.0.0.2" };
+    render(<DeviceCard device={usb} onRefresh={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Passer en WiFi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(screen.queryByText(/va arrêter le miroir/)).toBeNull();
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(vi.mocked(enableTcpip)).not.toHaveBeenCalled();
+    expect(useAppStore.getState().mirroringSerials).toEqual(["abc"]);
+  });
+
+  it("miroir actif + confirmer → stopMirror résolu avant enableTcpip", async () => {
+    vi.useFakeTimers();
+    useAppStore.setState({ mirroringSerials: ["abc"] });
+    const order: string[] = [];
+    mockStop.mockImplementation(async () => {
+      order.push("stop");
+    });
+    vi.mocked(enableTcpip).mockClear().mockImplementation(async () => {
+      order.push("tcpip");
+    });
+    vi.mocked(connectWireless).mockResolvedValue("connected");
+    const usb: Device = { ...PHONE, ip_address: "10.0.0.2" };
+    render(<DeviceCard device={usb} onRefresh={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Passer en WiFi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Arrêter le miroir et passer en WiFi" }));
+    await act(() => vi.advanceTimersByTimeAsync(1500));
+    vi.useRealTimers();
+
+    expect(order).toEqual(["stop", "tcpip"]);
+    expect(mockStop).toHaveBeenCalledWith("abc");
+    expect(useAppStore.getState().mirroringSerials).toEqual([]);
+    expect(vi.mocked(connectWireless)).toHaveBeenCalledWith("10.0.0.2", 5555);
+  });
 });
