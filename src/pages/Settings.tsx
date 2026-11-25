@@ -2,6 +2,9 @@ import { Monitor, Zap, Volume2, Layers, Hand, Sun, Moon, Gauge } from "lucide-re
 import { useAppStore } from "../store";
 import Tooltip from "../components/Tooltip";
 import { delay } from "../lib/motion";
+// Version lue dans package.json à la compilation (import nommé : Vite
+// n'embarque que ce champ, pas le reste du fichier).
+import { version as appVersion } from "../../package.json";
 
 export default function Settings() {
   const { defaultSettings, updateDefaultSettings, theme, toggleTheme } =
@@ -178,7 +181,7 @@ export default function Settings() {
         {/* Version */}
         <div className="pt-2 pb-6">
           <p className="text-xs text-fg-2 text-center">
-            PhoneMirror v0.1.0 — Propulsé par scrcpy
+            PhoneMirror v{appVersion} — Propulsé par scrcpy
           </p>
         </div>
       </div>

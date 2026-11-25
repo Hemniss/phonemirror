@@ -106,7 +106,7 @@ Le script installe automatiquement : les dépendances système WebKit/GTK, Node.
 ```bash
 sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf adb
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# Installer scrcpy depuis https://github.com/Genymobile/scrcpy/releases (version >= 2.0)
+bash scripts/download-scrcpy.sh   # scrcpy 4.1, empreinte SHA256 vérifiée
 npm install
 ```
 
@@ -212,20 +212,30 @@ phonemirror/
 | Styles | [Tailwind CSS 3](https://tailwindcss.com/) |
 | État | [Zustand 4](https://zustand-demo.pmnd.rs/) |
 | Icônes | [Lucide React](https://lucide.dev/) |
-| Mirror | [scrcpy >= 2.0](https://github.com/Genymobile/scrcpy) |
+| Mirror | [scrcpy 4.1](https://github.com/Genymobile/scrcpy), embarqué (récupéré par `scripts/download-scrcpy.sh`) |
 
 ## Raccourcis scrcpy (dans la fenêtre de mirroring)
 
+`MOD` est le modificateur de raccourcis de scrcpy : par défaut **Alt gauche** ou
+**Super gauche** (touche Windows, ou ⌘ Cmd gauche sur macOS). Il se change avec
+l'option `--shortcut-mod` de scrcpy (par exemple `--shortcut-mod=lctrl`).
+Liste complète : `scrcpy --help`, section « Shortcuts ».
+
 | Raccourci | Action |
 |-----------|--------|
-| `Ctrl+H` | Bouton Home |
-| `Ctrl+B` | Bouton Retour |
-| `Ctrl+M` | Bouton Menu |
-| `Ctrl+↑/↓` | Volume +/- |
-| `Ctrl+P` | Écran ON/OFF |
-| `Ctrl+N` | Notifications |
-| `F` | Plein écran |
-| `Ctrl+R` | Rotation |
+| `MOD+H` ou clic milieu | Bouton Home |
+| `MOD+B`, `MOD+Retour arrière` ou clic droit | Bouton Retour |
+| `MOD+S` | Applications récentes |
+| `MOD+M` | Bouton Menu |
+| `MOD+↑` / `MOD+↓` | Volume + / - |
+| `MOD+P` | Bouton Power (écran ON/OFF) |
+| `MOD+O` | Éteindre l'écran du téléphone (le mirroring continue) |
+| `MOD+N` / `MOD+Shift+N` | Ouvrir / fermer les notifications |
+| `MOD+F` ou `F11` | Plein écran |
+| `MOD+←` / `MOD+→` | Rotation de l'affichage |
+| `MOD+R` | Rotation de l'écran du téléphone |
+| `MOD+C` / `MOD+X` / `MOD+V` | Copier / couper / coller (Android 7 et plus) |
+| `MOD+Q` | Quitter |
 
 ## Licence
 
