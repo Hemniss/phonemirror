@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use crate::process;
+use std::path::Path;
+use std::process::Output;
+use std::time::Duration;
 use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,88 +65,144 @@ pub fn get_adb_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Err(format!("ADB introuvable. {HINT}"))
 }
 
+/// Délai de `adb devices`.
+const DEVICES_TIMEOUT: Duration = Duration::from_secs(5);
+/// Délai du `shell` qui lit les informations d'un appareil.
+const SHELL_TIMEOUT: Duration = Duration::from_secs(3);
+/// Délai de `connect`, `pair`, `tcpip` et `disconnect`.
+const NETWORK_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// Lance `adb <args>` avec un délai maximal.
+fn run_adb(adb: &Path, args: &[&str], timeout: Duration) -> Result<Output, String> {
+    process::output_with_timeout(process::command(adb).args(args), timeout)
+}
+
+/// Exécute un travail bloquant hors du runtime async.
+async fn blocking<T, F>(f: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("Tâche ADB interrompue : {e}"))?
+}
+
 /// Liste les appareils Android connectés (USB + WiFi).
 #[tauri::command]
 pub async fn list_devices(app: AppHandle) -> Result<Vec<Device>, String> {
     let adb = get_adb_path(&app)?;
+    blocking(move || list_devices_with(&adb)).await
+}
 
-    let output = process::command(&adb)
-        .args(["devices", "-l"])
-        .output()
-        .map_err(|e| format!("Erreur ADB: {e}"))?;
+/// Lignes utiles de `adb devices -l` : `(serial, état)`.
+/// Ignore l'en-tête, les lignes vides et les messages `* daemon …`.
+fn parse_devices(stdout: &str) -> Vec<(String, String)> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('*') && !l.starts_with("List of devices"))
+        .filter_map(|l| {
+            let mut parts = l.split_whitespace();
+            Some((parts.next()?.to_string(), parts.next()?.to_string()))
+        })
+        .collect()
+}
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let mut devices = Vec::new();
-
-    for line in stdout.lines().skip(1) {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('*') {
-            continue;
-        }
-
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 2 {
-            continue;
-        }
-
-        let serial = parts[0].to_string();
-        let state = parts[1].to_string();
-        let connection_type = if serial.contains(':') {
-            "wireless"
-        } else {
-            "usb"
-        }
-        .to_string();
-
-        if state != "device" {
-            // Appareil offline ou non autorisé
-            devices.push(Device {
-                serial: serial.clone(),
-                model: "Appareil inconnu".to_string(),
-                product: String::new(),
-                state,
-                connection_type,
-                android_version: String::new(),
-                ip_address: extract_ip_from_serial(&serial),
-            });
-            continue;
-        }
-
-        let (model, product, android_version, ip_address) =
-            get_device_info(&adb, &serial, connection_type == "usb");
-
-        devices.push(Device {
-            serial,
-            model,
-            product,
-            state,
-            connection_type,
-            android_version,
-            ip_address,
-        });
+/// Type de connexion déduit du serial.
+fn connection_type(serial: &str) -> &'static str {
+    if serial.contains(':') {
+        "wireless"
+    } else {
+        "usb"
     }
+}
 
+fn list_devices_with(adb: &Path) -> Result<Vec<Device>, String> {
+    let output = run_adb(adb, &["devices", "-l"], DEVICES_TIMEOUT)
+        .map_err(|e| format!("Erreur ADB : {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Un `shell` par appareil, en parallèle : un appareil lent ne retarde pas
+    // les autres au-delà de SHELL_TIMEOUT.
+    let devices = std::thread::scope(|scope| {
+        let handles: Vec<_> = parse_devices(&stdout)
+            .into_iter()
+            .map(|(serial, state)| scope.spawn(move || build_device(adb, serial, state)))
+            .collect();
+        handles
+            .into_iter()
+            .filter_map(|h| h.join().ok())
+            .collect()
+    });
     Ok(devices)
 }
 
+fn build_device(adb: &Path, serial: String, state: String) -> Device {
+    let connection_type = connection_type(&serial).to_string();
+
+    if state != "device" {
+        // Appareil offline ou non autorisé
+        return Device {
+            ip_address: extract_ip_from_serial(&serial),
+            serial,
+            model: "Appareil inconnu".to_string(),
+            product: String::new(),
+            state,
+            connection_type,
+            android_version: String::new(),
+        };
+    }
+
+    let info = get_device_info(adb, &serial, connection_type == "usb");
+    Device {
+        serial,
+        model: info.model,
+        product: info.product,
+        state,
+        connection_type,
+        android_version: info.android_version,
+        ip_address: info.ip,
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct DeviceInfo {
+    model: String,
+    product: String,
+    android_version: String,
+    ip: Option<String>,
+}
+
+impl DeviceInfo {
+    fn unknown() -> Self {
+        DeviceInfo {
+            model: "Inconnu".to_string(),
+            product: String::new(),
+            android_version: String::new(),
+            ip: None,
+        }
+    }
+}
+
 /// Récupère modèle, produit, version Android et IP en **une seule** commande shell.
-/// Remplace les anciens appels séquentiels à get_prop × 3 + get_device_ip.
-fn get_device_info(
-    adb: &std::path::Path,
-    serial: &str,
-    fetch_ip: bool,
-) -> (String, String, String, Option<String>) {
+/// En cas d'erreur ou de dépassement de SHELL_TIMEOUT : modèle « Inconnu ».
+fn get_device_info(adb: &Path, serial: &str, fetch_ip: bool) -> DeviceInfo {
     let cmd = if fetch_ip {
         "printf '%s\\n%s\\n%s\\n' \"$(getprop ro.product.model)\" \"$(getprop ro.product.name)\" \"$(getprop ro.build.version.release)\"; ip -f inet addr show wlan0 2>/dev/null"
     } else {
         "printf '%s\\n%s\\n%s\\n' \"$(getprop ro.product.model)\" \"$(getprop ro.product.name)\" \"$(getprop ro.build.version.release)\""
     };
 
-    let Ok(output) = process::command(adb).args(["-s", serial, "shell", cmd]).output() else {
-        return ("Inconnu".to_string(), String::new(), String::new(), None);
-    };
+    match run_adb(adb, &["-s", serial, "shell", cmd], SHELL_TIMEOUT) {
+        Ok(output) => parse_device_info(&String::from_utf8_lossy(&output.stdout), fetch_ip),
+        Err(_) => DeviceInfo::unknown(),
+    }
+}
 
-    let text = String::from_utf8_lossy(&output.stdout);
+/// Analyse la sortie du `shell` de `get_device_info` : trois lignes (modèle,
+/// produit, version), puis éventuellement la sortie de `ip addr show wlan0`.
+fn parse_device_info(text: &str, fetch_ip: bool) -> DeviceInfo {
     let mut lines = text.lines();
 
     let model = lines.next().unwrap_or("").trim().to_string();
@@ -163,7 +222,12 @@ fn get_device_info(
         None
     };
 
-    (model, product, android_version, ip)
+    DeviceInfo {
+        model,
+        product,
+        android_version,
+        ip,
+    }
 }
 
 fn extract_ip_from_serial(serial: &str) -> Option<String> {
@@ -178,12 +242,12 @@ fn extract_ip_from_serial(serial: &str) -> Option<String> {
 #[tauri::command]
 pub async fn connect_wireless(app: AppHandle, ip: String, port: u16) -> Result<String, String> {
     let adb = get_adb_path(&app)?;
-    let addr = format!("{ip}:{port}");
+    blocking(move || connect_with(&adb, &ip, port)).await
+}
 
-    let output = process::command(&adb)
-        .args(["connect", &addr])
-        .output()
-        .map_err(|e| e.to_string())?;
+fn connect_with(adb: &Path, ip: &str, port: u16) -> Result<String, String> {
+    let addr = format!("{ip}:{port}");
+    let output = run_adb(adb, &["connect", &addr], NETWORK_TIMEOUT)?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     if stdout.contains("connected") {
@@ -197,10 +261,11 @@ pub async fn connect_wireless(app: AppHandle, ip: String, port: u16) -> Result<S
 #[tauri::command]
 pub async fn disconnect_device(app: AppHandle, serial: String) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    process::command(&adb)
-        .args(["disconnect", &serial])
-        .output()
-        .map_err(|e| e.to_string())?;
+    blocking(move || disconnect_with(&adb, &serial)).await
+}
+
+fn disconnect_with(adb: &Path, serial: &str) -> Result<(), String> {
+    run_adb(adb, &["disconnect", serial], NETWORK_TIMEOUT)?;
     Ok(())
 }
 
@@ -208,14 +273,13 @@ pub async fn disconnect_device(app: AppHandle, serial: String) -> Result<(), Str
 #[tauri::command]
 pub async fn enable_tcpip(app: AppHandle, serial: String, port: u16) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    let output = process::command(&adb)
-        .args(["-s", &serial, "tcpip", &port.to_string()])
-        .output()
-        .map_err(|e| e.to_string())?;
+    blocking(move || tcpip_with(&adb, &serial, port)).await
+}
 
+fn tcpip_with(adb: &Path, serial: &str, port: u16) -> Result<(), String> {
+    let output = run_adb(adb, &["-s", serial, "tcpip", &port.to_string()], NETWORK_TIMEOUT)?;
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(stderr);
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }
     Ok(())
 }
@@ -229,12 +293,12 @@ pub async fn pair_device(
     code: String,
 ) -> Result<(), String> {
     let adb = get_adb_path(&app)?;
-    let addr = format!("{ip}:{port}");
+    blocking(move || pair_with(&adb, &ip, port, &code)).await
+}
 
-    let output = process::command(&adb)
-        .args(["pair", &addr, &code])
-        .output()
-        .map_err(|e| e.to_string())?;
+fn pair_with(adb: &Path, ip: &str, port: u16, code: &str) -> Result<(), String> {
+    let addr = format!("{ip}:{port}");
+    let output = run_adb(adb, &["pair", &addr, code], NETWORK_TIMEOUT)?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     if stdout.contains("Successfully paired") {
@@ -249,6 +313,79 @@ pub async fn pair_device(
 #[tauri::command]
 pub async fn get_device_ip_address(app: AppHandle, serial: String) -> Result<String, String> {
     let adb = get_adb_path(&app)?;
-    let (_, _, _, ip) = get_device_info(&adb, &serial, true);
-    ip.ok_or_else(|| "IP introuvable".to_string())
+    blocking(move || {
+        get_device_info(&adb, &serial, true)
+            .ip
+            .ok_or_else(|| "IP introuvable".to_string())
+    })
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Faux adb : script shell exécutable dans un dossier temporaire, supprimé au drop.
+    #[cfg(unix)]
+    struct FakeAdb {
+        dir: std::path::PathBuf,
+        path: std::path::PathBuf,
+    }
+
+    #[cfg(unix)]
+    impl FakeAdb {
+        fn new(body: &str) -> Self {
+            use std::os::unix::fs::PermissionsExt;
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static N: AtomicUsize = AtomicUsize::new(0);
+            let dir = std::env::temp_dir().join(format!(
+                "pm-fake-adb-{}-{}",
+                std::process::id(),
+                N.fetch_add(1, Ordering::SeqCst)
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("adb");
+            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            FakeAdb { dir, path }
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for FakeAdb {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn network_call_times_out_on_hung_adb() {
+        let adb = FakeAdb::new("exec sleep 30");
+        let start = std::time::Instant::now();
+        let err = connect_with(&adb.path, "1.2.3.4", 5555).unwrap_err();
+        assert!(start.elapsed() < NETWORK_TIMEOUT + Duration::from_secs(1));
+        assert_eq!(err, "adb n'a pas répondu en 8 s");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn slow_shell_leaves_device_listed_as_unknown() {
+        let adb = FakeAdb::new(
+            r#"case "$1" in
+  devices) printf 'List of devices attached\nSLOW device usb:1 model:x\nFAST device usb:2 model:y\n' ;;
+  -s) if [ "$2" = SLOW ]; then exec sleep 30; fi
+      printf 'Pixel 7\npanther\n14\n' ;;
+esac"#,
+        );
+        let start = std::time::Instant::now();
+        let devices = list_devices_with(&adb.path).unwrap();
+        assert!(start.elapsed() < SHELL_TIMEOUT + Duration::from_secs(1));
+        assert_eq!(devices.len(), 2);
+        assert_eq!(devices[0].serial, "SLOW");
+        assert_eq!(devices[0].model, "Inconnu");
+        assert_eq!(devices[1].serial, "FAST");
+        assert_eq!(devices[1].model, "Pixel 7");
+        assert_eq!(devices[1].android_version, "14");
+    }
 }
