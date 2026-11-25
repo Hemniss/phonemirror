@@ -229,6 +229,7 @@ phonemirror/
 │   │   ├── process.rs         # Construction des commandes adb/scrcpy (sans console sous Windows)
 │   │   ├── mirror_table.rs    # Table des miroirs actifs par appareil
 │   │   ├── ipc_surface.rs     # Garde-fou : liste figée des commandes IPC exposées
+│   │   ├── bounds.rs          # Bornes des valeurs saisies, vérifiées avant adb et scrcpy
 │   │   ├── profiles.rs        # Profils JSON persistés
 │   │   ├── lib.rs             # Entry point Tauri
 │   │   └── main.rs
@@ -249,7 +250,7 @@ phonemirror/
 │   ├── styles/            # Design system : tokens.css, bundle.css, fonts/
 │   ├── store/             # État global Zustand
 │   ├── hooks/             # useDevices (polling ADB, setTimeout récursif non-chevauchant)
-│   ├── lib/               # tauri.ts (wrappers invoke Tauri), motion.ts (animations)
+│   ├── lib/               # tauri.ts (wrappers invoke Tauri), validation.ts (bornes de saisie), motion.ts (animations)
 │   └── types/             # Types TypeScript partagés
 ├── scripts/
 │   ├── download-scrcpy.sh # Télécharge scrcpy 4.1 (SHA256 vérifié) dans src-tauri/resources/scrcpy/

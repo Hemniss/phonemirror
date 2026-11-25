@@ -69,8 +69,6 @@ export default function DeviceCard({ device, onRefresh, index = 0 }: Props) {
           fullscreen: defaultSettings.fullscreen,
           borderless: defaultSettings.borderless,
           show_touches: defaultSettings.show_touches,
-          rotation: null,
-          record_path: null,
           window_title: device.model,
         });
         setMirroring(device.serial, true);

@@ -71,7 +71,6 @@ fn get_scrcpy_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Err(format!("scrcpy introuvable. {HINT}"))
 }
 
-/// Construit les arguments de scrcpy pour une configuration. Fonction pure.
 /// Refuse une configuration hors bornes avant de lancer scrcpy.
 fn validate_config(config: &MirrorConfig) -> Result<(), String> {
     check_opt_range("FPS maximum", config.max_fps, MAX_FPS)?;
@@ -80,6 +79,7 @@ fn validate_config(config: &MirrorConfig) -> Result<(), String> {
     check_opt_range("Tampon d'affichage (ms)", config.video_buffer, VIDEO_BUFFER_MS)
 }
 
+/// Construit les arguments de scrcpy pour une configuration. Fonction pure.
 pub fn build_scrcpy_args(config: &MirrorConfig) -> Vec<String> {
     let mut args: Vec<String> = vec!["-s".to_string(), config.serial.clone()];
 
