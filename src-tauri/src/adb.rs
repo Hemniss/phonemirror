@@ -368,7 +368,8 @@ mod tests {
     #[cfg(unix)]
     impl FakeAdb {
         fn new(body: &str) -> Self {
-            use std::os::unix::fs::PermissionsExt;
+            use std::io::Write;
+            use std::process::{Command, Stdio};
             use std::sync::atomic::{AtomicUsize, Ordering};
             static N: AtomicUsize = AtomicUsize::new(0);
             let dir = std::env::temp_dir().join(format!(
@@ -378,8 +379,19 @@ mod tests {
             ));
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("adb");
-            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            // Le script est écrit par un processus à part. Si le processus des
+            // tests l'ouvrait lui-même en écriture, un lancement fait au même
+            // moment par un autre test hériterait un instant du descripteur, et
+            // Linux refuserait d'exécuter le script (« Text file busy »).
+            let mut writer = Command::new("/bin/sh")
+                .args(["-c", "cat > \"$0\" && chmod 755 \"$0\""])
+                .arg(&path)
+                .stdin(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let script = format!("#!/bin/sh\n{body}\n");
+            writer.stdin.take().unwrap().write_all(script.as_bytes()).unwrap();
+            assert!(writer.wait().unwrap().success(), "écriture du faux adb impossible");
             FakeAdb { dir, path }
         }
     }
