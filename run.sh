@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PhoneMirror — Lancer l'application
-# Usage : bash run.sh [dev|build|start]
+# Usage : bash run.sh [dev|build|start|install]
 
 set -euo pipefail
 
@@ -95,7 +95,7 @@ EOF
         echo "  build   — Compile et lance l'application (défaut)"
         echo "  start   — Lance le binaire déjà compilé"
         echo "  dev     — Mode développement avec hot-reload"
-        echo "  install — Crée un raccourci dans le menu des applications"
+        echo "  install — Linux : raccourci dans le menu des applications ; macOS : copie dans /Applications"
         exit 1
         ;;
 esac

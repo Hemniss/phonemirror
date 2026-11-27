@@ -16,32 +16,26 @@
 
 ### Utilisateurs — installeur prêt à l'emploi
 
-Rendez-vous sur la page [**Releases**](https://github.com/Hemniss/phonemirror/releases)
-et téléchargez le fichier correspondant à votre système.
+> **La version publiée est ancienne.** La page
+> [**Releases**](https://github.com/Hemniss/phonemirror/releases) ne propose que
+> la **v0.1.0** (août 2026), pour Windows et Linux. Le reste de ce README décrit
+> le code actuel de la branche `master` : le support de macOS, la confirmation
+> avant « Passer en WiFi », la plage de débit 2–32 Mb/s et les corrections de
+> novembre 2026 (stabilité, sécurité) **ne sont dans aucun installeur publié**.
+> Pour les avoir, [compilez depuis les sources](#compiler-depuis-les-sources-développeurs).
 
 | Système | Fichier | Remarque |
 |---|---|---|
-| Windows | `PhoneMirror_x.y.z_x64-setup.exe` | Aucun droit administrateur requis |
-| macOS Apple Silicon | `PhoneMirror_x.y.z_aarch64.dmg` | M1 et suivants |
-| macOS Intel | `PhoneMirror_x.y.z_x64.dmg` | |
-| Linux (Debian/Ubuntu) | `.deb` | `sudo apt install ./PhoneMirror_*.deb` |
-| Linux (autre) | `.AppImage` | `chmod +x` puis double-clic |
+| Windows | `PhoneMirror_0.1.0_x64-setup.exe` | Aucun droit administrateur requis |
+| Linux (Debian/Ubuntu) | `PhoneMirror_0.1.0_amd64.deb` | `sudo apt install ./PhoneMirror_0.1.0_amd64.deb` |
+| Linux (autre) | `PhoneMirror_0.1.0_amd64.AppImage` | `chmod +x` puis double-clic |
+| macOS | aucun installeur publié | compiler depuis les sources |
 
 **scrcpy et adb sont inclus dans l'installeur** : rien d'autre à installer.
 
 Sur Windows, l'application n'étant pas signée par un certificat payant,
 SmartScreen affiche un avertissement au premier lancement. Cliquez sur
 **Informations complémentaires** puis **Exécuter quand même**.
-
-Sur macOS, l'application n'est pas notarisée par Apple. Après avoir glissé
-PhoneMirror dans le dossier Applications, ouvrez le Terminal et lancez :
-
-```bash
-xattr -cr /Applications/PhoneMirror.app
-```
-
-Sans cette commande, macOS refuse d'ouvrir l'application. Elle retire
-l'attribut de quarantaine que le système pose sur tout fichier téléchargé.
 
 Il reste à activer le débogage USB sur le téléphone — voir
 [Prérequis téléphone Android](#prérequis-téléphone-android) plus bas.
@@ -50,8 +44,12 @@ Il reste à activer le débogage USB sur le téléphone — voir
 
 ## Compiler depuis les sources (développeurs)
 
-Cette section ne concerne que le développement. Pour simplement utiliser
-l'application, servez-vous de l'installeur ci-dessus.
+Cette section sert au développement, et à utiliser le code actuel (seule voie
+sous macOS).
+
+> Vérifié au 27/11/2026 : compilation et tests sur macOS Apple Silicon. Depuis
+> les corrections de novembre 2026, ni `install.sh` sous Linux ni l'application
+> sous Windows n'ont été essayés.
 
 ### Windows
 
@@ -108,8 +106,13 @@ Ensuite, utilisez le script `run.sh` :
 ./run.sh          # Compile et lance l'application (défaut)
 ./run.sh start    # Lance le binaire déjà compilé
 ./run.sh dev      # Mode développement avec hot-reload
-./run.sh install  # Crée un raccourci dans le menu des applications
+./run.sh install  # Linux : crée un raccourci dans le menu des applications
+                  # macOS : copie PhoneMirror.app dans /Applications
 ```
+
+Sur macOS, si `/Applications/PhoneMirror.app` existe déjà, supprimez-la avant de
+relancer `./run.sh install` : sinon la nouvelle app est copiée **à l'intérieur**
+de l'ancienne, et c'est l'ancienne qui continue de se lancer.
 
 Sous Linux, le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman. Pour scrcpy, il ne fait rien si un scrcpy 2.0 ou plus récent est déjà présent ; sinon il installe dans `/opt/scrcpy` la version 4.1 depuis GitHub, après vérification de son empreinte SHA256 épinglée.
 
@@ -121,7 +124,14 @@ Sous Linux, le script installe automatiquement : les dépendances système WebKi
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://rustup.rs/)
 - [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) avec le workload **Développement Desktop en C++**
-- [scrcpy](https://github.com/Genymobile/scrcpy) (`winget install Genymobile.scrcpy`)
+- [Git for Windows](https://git-scm.com/download/win), pour Git Bash
+
+Puis, depuis Git Bash, à la racine du dépôt :
+
+```bash
+bash scripts/download-scrcpy.sh   # scrcpy 4.1, empreinte SHA256 vérifiée (obligatoire)
+npm install
+```
 
 </details>
 
@@ -164,6 +174,7 @@ Les installeurs se trouvent dans `src-tauri/target/release/bundle/`.
 cargo test --manifest-path src-tauri/Cargo.toml   # backend Rust (nécessite src-tauri/resources/scrcpy/)
 npm test                                          # frontend (Vitest)
 bash scripts/tests/download-scrcpy.test.sh        # script de téléchargement de scrcpy
+bash scripts/tests/install.test.sh                # garde-fous d'install.sh (rien n'est installé)
 ```
 
 `cargo test` passe par le script de build de Tauri, qui exige le dossier de
@@ -208,13 +219,17 @@ le téléphone jusqu'à son redémarrage ; la carte de l'appareil le rappelle.
 |-----------|-------------|
 | Résolution max | Résolution de l'écran mirroré (480p–2160p) |
 | FPS maximum | Images par seconde (15–120) |
-| Débit vidéo | Bande passante vidéo en Mb/s (2–32) |
+| Débit vidéo | Bande passante vidéo en Mb/s (2–32, voir la note ci-dessous) |
 | Tampon d'affichage | Délai en ms avant affichage (`--video-buffer`) — 0 ms pour latence minimale, augmenter sur WiFi instable |
 | Audio | Transmet le son du téléphone (Android 11+) |
 | Toujours au premier plan | La fenêtre scrcpy reste visible au-dessus des autres |
 | Plein écran au démarrage | Lance scrcpy directement en plein écran |
 | Masquer la barre de titre | N'affiche que l'écran du téléphone, sans bandeau ni bordure (activé par défaut) |
 | Afficher les touches | Cercles visuels à chaque toucher (utile pour enregistrements) |
+
+> **Profils créés avec une ancienne version** : le débit y allait de 1 à 64 Mb/s.
+> Un profil enregistré hors de la plage 2–32 reste affiché, mais son lancement et
+> son enregistrement sont refusés tant que le débit n'est pas ramené dans la plage.
 
 > Le rendu est optimisé automatiquement selon la plateforme : **Direct3D** sur Windows, **Metal** sur macOS, **OpenGL** sur Linux.
 
