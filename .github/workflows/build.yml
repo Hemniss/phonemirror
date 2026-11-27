@@ -90,7 +90,9 @@ jobs:
       - name: Script tests
         if: runner.os != 'Windows'
         shell: bash
-        run: bash scripts/tests/download-scrcpy.test.sh
+        run: |
+          bash scripts/tests/download-scrcpy.test.sh
+          bash scripts/tests/install.test.sh
 
       - name: Build Tauri application
         uses: tauri-apps/tauri-action@v0
