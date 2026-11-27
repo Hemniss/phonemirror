@@ -47,9 +47,10 @@ Il reste à activer le débogage USB sur le téléphone — voir
 Cette section sert au développement, et à utiliser le code actuel (seule voie
 sous macOS).
 
-> Vérifié au 27/11/2026 : compilation et tests sur macOS Apple Silicon. Depuis
-> les corrections de novembre 2026, ni `install.sh` sous Linux ni l'application
-> sous Windows n'ont été essayés.
+> Vérifié au 27/11/2026 : la CI compile et passe les tests sous Windows, Linux
+> (Ubuntu 22.04), macOS Apple Silicon et macOS Intel. Compiler n'est pas essayer :
+> depuis les corrections de novembre 2026, l'application n'a pas été lancée sous
+> Windows ni sous Linux, et `install.sh` n'a pas été exécuté sous Linux.
 
 ### Windows
 
