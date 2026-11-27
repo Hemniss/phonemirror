@@ -65,7 +65,16 @@ case "$MODE" in
         if [ "$(uname -s)" = "Darwin" ]; then
             APP=$(find_app_bundle) || { echo "❌ Bundle .app introuvable. Lancez d'abord : ./run.sh build"; exit 1; }
             echo "📦 Copie de PhoneMirror.app dans /Applications..."
-            cp -r "$APP" /Applications/PhoneMirror.app
+            # PHONEMIRROR_APPS_DIR ne sert qu'aux tests.
+            APPS_DIR="${PHONEMIRROR_APPS_DIR:-/Applications}"
+            DEST="$APPS_DIR/PhoneMirror.app"
+            STAGE="$APPS_DIR/.PhoneMirror.app.nouveau"
+            # Copier à côté, puis échanger : `cp` vers une app existante placerait
+            # la nouvelle à l'intérieur, et un échec de copie garde l'ancienne.
+            rm -rf "$STAGE"
+            cp -R "$APP" "$STAGE" || { rm -rf "$STAGE"; echo "❌ Copie impossible : rien n'a été modifié."; exit 1; }
+            rm -rf "$DEST"
+            mv "$STAGE" "$DEST"
             echo "✅ PhoneMirror installé dans /Applications."
             echo "   Vous pouvez le lancer depuis le Launchpad ou Spotlight."
             exit 0

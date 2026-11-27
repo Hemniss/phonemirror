@@ -107,12 +107,9 @@ Ensuite, utilisez le script `run.sh` :
 ./run.sh start    # Lance le binaire déjà compilé
 ./run.sh dev      # Mode développement avec hot-reload
 ./run.sh install  # Linux : crée un raccourci dans le menu des applications
-                  # macOS : copie PhoneMirror.app dans /Applications
+                  # macOS : installe PhoneMirror.app dans /Applications
+                  #         (remplace la copie existante)
 ```
-
-Sur macOS, si `/Applications/PhoneMirror.app` existe déjà, supprimez-la avant de
-relancer `./run.sh install` : sinon la nouvelle app est copiée **à l'intérieur**
-de l'ancienne, et c'est l'ancienne qui continue de se lancer.
 
 Sous Linux, le script installe automatiquement : les dépendances système WebKit/GTK, Node.js, Rust, ADB, et configure les règles udev pour l'accès USB Android. Compatible apt, dnf et pacman. Pour scrcpy, il ne fait rien si un scrcpy 2.0 ou plus récent est déjà présent ; sinon il installe dans `/opt/scrcpy` la version 4.1 depuis GitHub, après vérification de son empreinte SHA256 épinglée.
 
@@ -175,6 +172,7 @@ cargo test --manifest-path src-tauri/Cargo.toml   # backend Rust (nécessite src
 npm test                                          # frontend (Vitest)
 bash scripts/tests/download-scrcpy.test.sh        # script de téléchargement de scrcpy
 bash scripts/tests/install.test.sh                # garde-fous d'install.sh (rien n'est installé)
+bash scripts/tests/run-install.test.sh            # run.sh install sous macOS, dans un dossier temporaire
 ```
 
 `cargo test` passe par le script de build de Tauri, qui exige le dossier de

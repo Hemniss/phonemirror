@@ -93,6 +93,7 @@ jobs:
         run: |
           bash scripts/tests/download-scrcpy.test.sh
           bash scripts/tests/install.test.sh
+          bash scripts/tests/run-install.test.sh
 
       - name: Build Tauri application
         uses: tauri-apps/tauri-action@v0
